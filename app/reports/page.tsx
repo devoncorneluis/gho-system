@@ -1,0 +1,96 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
+
+const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
+
+type Trip = {
+  id: string;
+  status: string | null;
+};
+
+export default function ReportsPage() {
+  const [trips, setTrips] = useState<Trip[]>([]);
+
+  async function loadTrips() {
+    const { data, error } = await supabase
+      .from("trips")
+      .select("id, status")
+      .eq("platform_id", PLATFORM_ID);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setTrips(data || []);
+  }
+
+  useEffect(() => {
+    loadTrips();
+  }, []);
+
+  const totalTrips = trips.length;
+  const assignedTrips = trips.filter((trip) => trip.status === "Assigned").length;
+  const completedTrips = trips.filter((trip) => trip.status === "Completed").length;
+  const suggestedTrips = trips.filter((trip) => trip.status === "Suggested").length;
+
+  return (
+    <main className="min-h-screen bg-gray-100 p-6">
+      <h1 className="text-4xl font-bold text-[#061B33]">Reports</h1>
+
+      <p className="text-gray-600 mt-2">
+        View transport performance and trip summaries.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+        <div className="bg-white rounded-xl shadow p-6">
+          <p className="font-bold">Total Trips</p>
+          <p className="text-4xl text-orange-500 font-bold">{totalTrips}</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6">
+          <p className="font-bold">Assigned Trips</p>
+          <p className="text-4xl text-orange-500 font-bold">{assignedTrips}</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6">
+          <p className="font-bold">Completed Trips</p>
+          <p className="text-4xl text-orange-500 font-bold">{completedTrips}</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6">
+          <p className="font-bold">Suggested Trips</p>
+          <p className="text-4xl text-orange-500 font-bold">{suggestedTrips}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="font-bold text-xl">Daily Report</h2>
+          <p className="text-gray-600 mt-2">Trips completed today.</p>
+          <button className="mt-4 bg-orange-500 text-white px-4 py-2 rounded-lg font-bold">
+            Export PDF
+          </button>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="font-bold text-xl">Driver Report</h2>
+          <p className="text-gray-600 mt-2">Driver trips and performance.</p>
+          <button className="mt-4 bg-orange-500 text-white px-4 py-2 rounded-lg font-bold">
+            Export Excel
+          </button>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="font-bold text-xl">Vehicle Report</h2>
+          <p className="text-gray-600 mt-2">Vehicle usage and availability.</p>
+          <button className="mt-4 bg-orange-500 text-white px-4 py-2 rounded-lg font-bold">
+            Export CSV
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}
