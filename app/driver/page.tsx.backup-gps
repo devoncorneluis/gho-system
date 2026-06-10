@@ -28,7 +28,6 @@ type Driver = {
   assigned_vehicle: string | null;
   availability_status: string | null;
   status: string | null;
-  photo_url: string | null;
 };
 
 type TripPassenger = {
@@ -47,9 +46,6 @@ export default function DriverPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [driver, setDriver] = useState<Driver | null>(null);
   const [passengers, setPassengers] = useState<TripPassenger[]>([]);
-  const [tracking, setTracking] = useState(false);
-  const [watchId, setWatchId] = useState<number | null>(null);
-  const [locationMessage, setLocationMessage] = useState("");
 
   async function loadDriver() {
     const { data } = await supabase
@@ -76,88 +72,6 @@ export default function DriverPage() {
     }
 
     setTrips(data || []);
-  }
-
-  async function saveDriverLocation(latitude: number, longitude: number) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user?.email || !driver?.full_name) {
-      alert("Driver profile not loaded yet.");
-      return;
-    }
-
-    const { data: existing } = await supabase
-      .from("driver_locations")
-      .select("id")
-      .eq("platform_id", PLATFORM_ID)
-      .eq("driver_email", user.email)
-      .limit(1)
-      .single();
-
-    if (existing?.id) {
-      await supabase
-        .from("driver_locations")
-        .update({
-          driver_name: driver.full_name,
-          latitude,
-          longitude,
-          status: "Online",
-          last_updated: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      await supabase.from("driver_locations").insert({
-        platform_id: PLATFORM_ID,
-        driver_name: driver.full_name,
-        driver_email: user.email,
-        latitude,
-        longitude,
-        status: "Online",
-        last_updated: new Date().toISOString(),
-      });
-    }
-  }
-
-  function startGpsTracking() {
-    if (!navigator.geolocation) {
-      alert("Location is not supported on this device.");
-      return;
-    }
-
-    const id = navigator.geolocation.watchPosition(
-      async (position) => {
-        await saveDriverLocation(
-          position.coords.latitude,
-          position.coords.longitude
-        );
-
-        setTracking(true);
-        setLocationMessage("GPS tracking active. Location updated.");
-      },
-      () => {
-        alert("Location permission denied.");
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 10000,
-      }
-    );
-
-    setWatchId(id);
-    setTracking(true);
-  }
-
-  function stopGpsTracking() {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-    }
-
-    setWatchId(null);
-    setTracking(false);
-    setLocationMessage("GPS tracking stopped.");
   }
 
   async function updateTripStatus(tripId: string, status: string) {
@@ -226,39 +140,10 @@ export default function DriverPage() {
 
         {driver && (
           <div className="bg-white rounded-xl shadow p-6 mt-6">
-            <div className="flex flex-wrap gap-3 mb-5">
-              <button
-                onClick={startGpsTracking}
-                disabled={tracking}
-                className="bg-green-600 text-white px-5 py-3 rounded-lg font-bold disabled:bg-gray-400"
-              >
-                📍 Start GPS Tracking
-              </button>
-
-              <button
-                onClick={stopGpsTracking}
-                disabled={!tracking}
-                className="bg-red-600 text-white px-5 py-3 rounded-lg font-bold disabled:bg-gray-400"
-              >
-                Stop GPS Tracking
-              </button>
-            </div>
-
-            {locationMessage && (
-              <p className="text-green-700 font-bold mb-4">{locationMessage}</p>
-            )}
             <div className="flex gap-5 items-center">
-              {driver.photo_url ? (
-                <img
-                  src={driver.photo_url || ""}
-                  alt={driver.full_name}
-                  className="w-24 h-24 rounded-full object-cover border-4 border-orange-500"
-                />
-              ) : (
-                <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center text-4xl">
-                  📷
-                </div>
-              )}
+              <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center text-4xl">
+                📷
+              </div>
 
               <div>
                 <h2 className="text-2xl font-bold text-[#061B33]">

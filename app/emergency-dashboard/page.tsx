@@ -1,7 +1,7 @@
 "use client";
 
-import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { useEffect, useState } from "react";
+import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
 
 const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
@@ -9,16 +9,23 @@ const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
 type EmergencyAlert = {
   id: string;
   driver_name: string | null;
+  vehicle_name: string | null;
+  vehicle_registration: string | null;
   alert_type: string | null;
-  latitude: number | null;
-  longitude: number | null;
+  emergency_type: string | null;
+  description: string | null;
   status: string | null;
   created_at: string | null;
+  assigned_agent: string | null;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  resolution_notes: string | null;
 };
 
 export default function EmergencyDashboardPage() {
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
-  const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(null);
+  const [agentInputs, setAgentInputs] = useState<Record<string, string>>({});
+  const [noteInputs, setNoteInputs] = useState<Record<string, string>>({});
 
   async function loadAlerts() {
     const { data, error } = await supabase
@@ -33,17 +40,16 @@ export default function EmergencyDashboardPage() {
     }
 
     setAlerts(data || []);
-
-    if (!selectedAlert && data && data.length > 0) {
-      setSelectedAlert(data[0]);
-    }
   }
 
-  async function updateAlertStatus(alertId: string, status: string) {
+  async function acknowledgeAlert(id: string) {
     const { error } = await supabase
       .from("emergency_alerts")
-      .update({ status })
-      .eq("id", alertId);
+      .update({
+        status: "Acknowledged",
+        acknowledged_at: new Date().toISOString(),
+      })
+      .eq("id", id);
 
     if (error) {
       alert(error.message);
@@ -53,104 +59,240 @@ export default function EmergencyDashboardPage() {
     loadAlerts();
   }
 
+  async function assignAgent(id: string) {
+    const assignedAgent = agentInputs[id];
+
+    if (!assignedAgent) {
+      alert("Please enter assigned agent name");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("emergency_alerts")
+      .update({
+        status: "Response Assigned",
+        assigned_agent: assignedAgent,
+      })
+      .eq("id", id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setAgentInputs({ ...agentInputs, [id]: "" });
+    loadAlerts();
+  }
+
+  async function resolveAlert(id: string) {
+    const resolutionNotes = noteInputs[id];
+
+    if (!resolutionNotes) {
+      alert("Please enter resolution notes before resolving");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("emergency_alerts")
+      .update({
+        status: "Resolved",
+        resolution_notes: resolutionNotes,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNoteInputs({ ...noteInputs, [id]: "" });
+    loadAlerts();
+  }
+
   useEffect(() => {
     loadAlerts();
+
+    const timer = setInterval(loadAlerts, 10000);
+
+    return () => clearInterval(timer);
   }, []);
 
-  const openAlerts = alerts.filter((alert) => alert.status === "Open").length;
+  const openAlerts = alerts.filter((alert) => alert.status === "Open");
+  const acknowledgedAlerts = alerts.filter(
+    (alert) => alert.status === "Acknowledged"
+  );
+  const assignedAlerts = alerts.filter(
+    (alert) => alert.status === "Response Assigned"
+  );
+  const resolvedAlerts = alerts.filter((alert) => alert.status === "Resolved");
 
-  const mapCenter =
-    selectedAlert?.latitude && selectedAlert?.longitude
-      ? { lat: selectedAlert.latitude, lng: selectedAlert.longitude }
-      : { lat: -33.918861, lng: 18.4233 };
+  const activeAlerts = alerts.filter((alert) => alert.status !== "Resolved");
 
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
-      <h1 className="text-4xl font-bold text-red-700">
-        🚨 Emergency Dashboard
-      </h1>
+    <AdminLayout>
+      <main className="min-h-screen bg-gray-100 p-6">
+        <h1 className="text-4xl font-bold text-red-700">
+          🚨 GHO Emergency Response Center
+        </h1>
 
-      <p className="text-gray-600 mt-2">
-        View panic alerts, driver emergency locations, and resolve incidents.
-      </p>
+        <p className="text-gray-600 mt-2">
+          Manage emergency workflow from open alert to response assignment and resolution.
+        </p>
 
-      <div className="bg-red-100 border border-red-500 text-red-800 rounded-xl p-6 mt-6">
-        <p className="font-bold">Open Alerts</p>
-        <p className="text-4xl font-bold">{openAlerts}</p>
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-6">
+          <div className="bg-red-50 border border-red-300 rounded-xl shadow p-5">
+            <p className="font-bold">Open</p>
+            <p className="text-4xl font-bold text-red-600">{openAlerts.length}</p>
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="text-xl font-bold mb-4">Emergency Alerts</h2>
+          <div className="bg-orange-50 border border-orange-300 rounded-xl shadow p-5">
+            <p className="font-bold">Acknowledged</p>
+            <p className="text-4xl font-bold text-orange-500">{acknowledgedAlerts.length}</p>
+          </div>
 
-          {alerts.length === 0 && (
-            <p className="text-gray-500">No emergency alerts yet.</p>
+          <div className="bg-blue-50 border border-blue-300 rounded-xl shadow p-5">
+            <p className="font-bold">Response Assigned</p>
+            <p className="text-4xl font-bold text-blue-600">{assignedAlerts.length}</p>
+          </div>
+
+          <div className="bg-green-50 border border-green-300 rounded-xl shadow p-5">
+            <p className="font-bold">Resolved</p>
+            <p className="text-4xl font-bold text-green-600">{resolvedAlerts.length}</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-5">
+            <p className="font-bold">Total Alerts</p>
+            <p className="text-4xl font-bold text-[#061B33]">{alerts.length}</p>
+          </div>
+        </div>
+
+        <section className="mt-8">
+          <h2 className="text-2xl font-bold text-red-700">
+            Active Emergency Workflow
+          </h2>
+
+          {activeAlerts.length === 0 && (
+            <p className="text-gray-500 mt-4">No active emergency alerts.</p>
           )}
 
-          {alerts.map((alert) => (
+          {activeAlerts.map((alert) => (
             <div
               key={alert.id}
-              className="border rounded-xl p-4 mb-4 cursor-pointer hover:bg-red-50"
-              onClick={() => setSelectedAlert(alert)}
+              className="bg-white rounded-xl shadow p-6 mt-4 border-l-8 border-red-600"
             >
-              <p><strong>Driver:</strong> {alert.driver_name}</p>
-              <p><strong>Type:</strong> {alert.alert_type}</p>
-              <p><strong>Status:</strong> {alert.status}</p>
-              <p><strong>Time:</strong> {alert.created_at}</p>
+              <div className="flex flex-col md:flex-row md:justify-between gap-4">
+                <div>
+                  <p className="text-xl font-bold text-red-700">
+                    🚨 {alert.emergency_type || alert.alert_type || "Emergency Alert"}
+                  </p>
 
-              <div className="flex gap-2 mt-3">
+                  <p className="mt-1 text-sm text-gray-500">
+                    Status: <strong>{alert.status || "Open"}</strong>
+                  </p>
+                </div>
+
+                <div className="bg-gray-100 rounded-lg px-4 py-2 text-sm">
+                  <p><strong>Created:</strong> {alert.created_at || "Unknown"}</p>
+                  <p><strong>Acknowledged:</strong> {alert.acknowledged_at || "Not yet"}</p>
+                  <p><strong>Resolved:</strong> {alert.resolved_at || "Not yet"}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-1">
+                  <p><strong>Driver:</strong> {alert.driver_name || "Unknown"}</p>
+                  <p><strong>Vehicle:</strong> {alert.vehicle_name || "Unknown"}</p>
+                  <p><strong>Registration:</strong> {alert.vehicle_registration || "Unknown"}</p>
+                  <p><strong>Assigned Agent:</strong> {alert.assigned_agent || "Not assigned"}</p>
+                </div>
+
+                <div>
+                  <p><strong>Description:</strong></p>
+                  <p className="bg-gray-50 rounded-lg p-3 mt-1">
+                    {alert.description || "No description provided"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    updateAlertStatus(alert.id, "Acknowledged");
-                  }}
-                  className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold"
+                  onClick={() => acknowledgeAlert(alert.id)}
+                  className="bg-orange-500 text-white px-5 py-3 rounded-lg font-bold"
                 >
                   Acknowledge
                 </button>
 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    updateAlertStatus(alert.id, "Resolved");
-                  }}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold"
-                >
-                  Resolve
-                </button>
+                <div className="flex gap-2">
+                  <input
+                    value={agentInputs[alert.id] || ""}
+                    onChange={(e) =>
+                      setAgentInputs({
+                        ...agentInputs,
+                        [alert.id]: e.target.value,
+                      })
+                    }
+                    className="border p-3 rounded-lg w-full"
+                    placeholder="Assign agent"
+                  />
+
+                  <button
+                    onClick={() => assignAgent(alert.id)}
+                    className="bg-blue-600 text-white px-4 py-3 rounded-lg font-bold"
+                  >
+                    Assign
+                  </button>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    value={noteInputs[alert.id] || ""}
+                    onChange={(e) =>
+                      setNoteInputs({
+                        ...noteInputs,
+                        [alert.id]: e.target.value,
+                      })
+                    }
+                    className="border p-3 rounded-lg w-full"
+                    placeholder="Resolution notes"
+                  />
+
+                  <button
+                    onClick={() => resolveAlert(alert.id)}
+                    className="bg-green-600 text-white px-4 py-3 rounded-lg font-bold"
+                  >
+                    Resolve
+                  </button>
+                </div>
               </div>
             </div>
           ))}
-        </div>
+        </section>
 
-        <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="text-xl font-bold mb-4">Alert Location</h2>
+        <section className="mt-10">
+          <h2 className="text-2xl font-bold text-[#061B33]">
+            Resolved Emergency History
+          </h2>
 
-          <div className="h-96 rounded-xl overflow-hidden">
-            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}>
-              <Map defaultCenter={mapCenter} defaultZoom={13}>
-                {selectedAlert?.latitude && selectedAlert?.longitude && (
-                  <Marker
-                    position={{
-                      lat: selectedAlert.latitude,
-                      lng: selectedAlert.longitude,
-                    }}
-                  />
-                )}
-              </Map>
-            </APIProvider>
-          </div>
-
-          {selectedAlert && (
-            <div className="mt-4 space-y-2">
-              <p><strong>Driver:</strong> {selectedAlert.driver_name}</p>
-              <p><strong>Latitude:</strong> {selectedAlert.latitude}</p>
-              <p><strong>Longitude:</strong> {selectedAlert.longitude}</p>
-              <p><strong>Status:</strong> {selectedAlert.status}</p>
-            </div>
+          {resolvedAlerts.length === 0 && (
+            <p className="text-gray-500 mt-4">No resolved alerts yet.</p>
           )}
-        </div>
-      </div>
-    </main>
+
+          {resolvedAlerts.map((alert) => (
+            <div key={alert.id} className="bg-white rounded-xl shadow p-6 mt-4 opacity-90">
+              <p className="font-bold">
+                ✅ {alert.emergency_type || alert.alert_type || "Emergency Alert"}
+              </p>
+              <p><strong>Driver:</strong> {alert.driver_name || "Unknown"}</p>
+              <p><strong>Vehicle:</strong> {alert.vehicle_name || "Unknown"}</p>
+              <p><strong>Registration:</strong> {alert.vehicle_registration || "Unknown"}</p>
+              <p><strong>Assigned Agent:</strong> {alert.assigned_agent || "Not assigned"}</p>
+              <p><strong>Resolution Notes:</strong> {alert.resolution_notes || "No notes"}</p>
+              <p><strong>Resolved:</strong> {alert.resolved_at || "Unknown"}</p>
+            </div>
+          ))}
+        </section>
+      </main>
+    </AdminLayout>
   );
 }

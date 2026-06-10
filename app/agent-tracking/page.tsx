@@ -2,19 +2,15 @@
 
 import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { useEffect, useState } from "react";
+import UserTopBar from "../../components/UserTopBar";
 import { supabase } from "../../lib/supabase";
 
 const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
 
-// Demo pickup point: Bishop Lavis area
-const PICKUP_LOCATION = {
-  lat: -33.9467,
-  lng: 18.5759,
-};
-
 type DriverLocation = {
   id: string;
   driver_name: string | null;
+  driver_email: string | null;
   latitude: number | null;
   longitude: number | null;
   status: string | null;
@@ -23,36 +19,14 @@ type DriverLocation = {
 
 type Trip = {
   id: string;
-  trip_code: string;
-  pickup_time: string | null;
-  dropoff_time: string | null;
+  trip_code: string | null;
   driver_name: string | null;
   vehicle_name: string | null;
   vehicle_registration: string | null;
+  pickup_time: string | null;
+  dropoff_time: string | null;
   status: string | null;
 };
-
-function getDistanceKm(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c;
-}
 
 export default function AgentTrackingPage() {
   const [locations, setLocations] = useState<DriverLocation[]>([]);
@@ -69,8 +43,7 @@ export default function AgentTrackingPage() {
       .from("trips")
       .select("*")
       .eq("platform_id", PLATFORM_ID)
-      .order("created_at", { ascending: false })
-      .limit(1);
+      .in("status", ["Assigned", "In Progress"]);
 
     setLocations(locationData || []);
     setTrips(tripData || []);
@@ -81,101 +54,98 @@ export default function AgentTrackingPage() {
 
     const timer = setInterval(() => {
       loadData();
-    }, 15000);
+    }, 10000);
 
     return () => clearInterval(timer);
   }, []);
 
-  const latestLocation = locations[0];
-  const trip = trips[0];
+  const firstLocation = locations.find(
+    (location) => location.latitude && location.longitude
+  );
 
   const center =
-    latestLocation?.latitude && latestLocation?.longitude
-      ? { lat: latestLocation.latitude, lng: latestLocation.longitude }
-      : PICKUP_LOCATION;
+    firstLocation?.latitude && firstLocation?.longitude
+      ? { lat: firstLocation.latitude, lng: firstLocation.longitude }
+      : { lat: -33.918861, lng: 18.4233 };
 
-  let distanceKm = 0;
-  let etaMinutes = 0;
-
-  if (latestLocation?.latitude && latestLocation?.longitude) {
-    distanceKm = getDistanceKm(
-      latestLocation.latitude,
-      latestLocation.longitude,
-      PICKUP_LOCATION.lat,
-      PICKUP_LOCATION.lng
-    );
-
-    etaMinutes = Math.ceil((distanceKm / 40) * 60);
+  function getTripForDriver(driverName: string | null) {
+    return trips.find((trip) => trip.driver_name === driverName);
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
-      <h1 className="text-4xl font-bold text-[#061B33]">
-        Agent Tracking
-      </h1>
+    <main className="min-h-screen bg-gray-100">
+      <UserTopBar />
 
-      <p className="text-gray-600 mt-2">
-        Track your driver, vehicle, ETA, and pickup details.
-      </p>
+      <div className="p-6">
+        <h1 className="text-4xl font-bold text-[#061B33]">
+          Agent Live Tracking
+        </h1>
 
-      {trip && (
+        <p className="text-gray-600 mt-2">
+          View live driver locations, vehicle details, and active trip status.
+        </p>
+
         <div className="bg-white rounded-xl shadow p-6 mt-6">
-          <h2 className="text-xl font-bold">My Transport Details</h2>
+          <div className="h-[500px] rounded-xl overflow-hidden">
+            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}>
+              <Map defaultCenter={center} defaultZoom={12}>
+                {locations.map((location) => {
+                  if (!location.latitude || !location.longitude) return null;
 
-          <div className="mt-4 space-y-2">
-            <p><strong>Trip:</strong> {trip.trip_code}</p>
-            <p><strong>Pickup Time:</strong> {trip.pickup_time}</p>
-            <p><strong>Drop-off Time:</strong> {trip.dropoff_time}</p>
-            <p><strong>Driver:</strong> {trip.driver_name}</p>
-            <p><strong>Vehicle:</strong> {trip.vehicle_name}</p>
-            <p><strong>Number Plate:</strong> {trip.vehicle_registration}</p>
-            <p><strong>Status:</strong> {trip.status}</p>
+                  return (
+                    <Marker
+                      key={location.id}
+                      position={{
+                        lat: location.latitude,
+                        lng: location.longitude,
+                      }}
+                    />
+                  );
+                })}
+              </Map>
+            </APIProvider>
           </div>
         </div>
-      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-        <div className="bg-white rounded-xl shadow p-6">
-          <p className="font-bold">Estimated Arrival</p>
-          <p className="text-4xl text-orange-500 font-bold">
-            {etaMinutes > 0 ? `${etaMinutes} min` : "Waiting"}
-          </p>
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+          {locations.map((location) => {
+            const trip = getTripForDriver(location.driver_name);
 
-        <div className="bg-white rounded-xl shadow p-6">
-          <p className="font-bold">Distance Away</p>
-          <p className="text-4xl text-orange-500 font-bold">
-            {distanceKm > 0 ? `${distanceKm.toFixed(1)} km` : "Waiting"}
-          </p>
+            return (
+              <div key={location.id} className="bg-white rounded-xl shadow p-6">
+                <h2 className="text-2xl font-bold text-[#061B33]">
+                  📍 {location.driver_name || "Unknown Driver"}
+                </h2>
+
+                <p><strong>Status:</strong> {location.status}</p>
+                <p><strong>Last Updated:</strong> {location.last_updated}</p>
+
+                {trip ? (
+                  <div className="bg-orange-50 rounded-xl p-4 mt-4">
+                    <p className="font-bold">Active Trip</p>
+                    <p><strong>Trip:</strong> {trip.trip_code}</p>
+                    <p><strong>Vehicle:</strong> {trip.vehicle_name}</p>
+                    <p><strong>Registration:</strong> {trip.vehicle_registration}</p>
+                    <p><strong>Pickup:</strong> {trip.pickup_time}</p>
+                    <p><strong>Drop-off:</strong> {trip.dropoff_time}</p>
+                    <p><strong>Trip Status:</strong> {trip.status}</p>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 mt-4">
+                    No active trip linked to this driver.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+
+          {locations.length === 0 && (
+            <p className="text-gray-500">
+              No live driver locations available yet.
+            </p>
+          )}
         </div>
       </div>
-
-      <div className="bg-white rounded-xl shadow p-6 mt-6">
-        <div className="h-96 rounded-xl overflow-hidden">
-          <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}>
-            <Map defaultCenter={center} defaultZoom={13}>
-              {latestLocation?.latitude && latestLocation?.longitude && (
-                <Marker
-                  position={{
-                    lat: latestLocation.latitude,
-                    lng: latestLocation.longitude,
-                  }}
-                />
-              )}
-
-              <Marker position={PICKUP_LOCATION} />
-            </Map>
-          </APIProvider>
-        </div>
-      </div>
-
-      {latestLocation && (
-        <div className="bg-white rounded-xl shadow p-6 mt-6">
-          <p><strong>Driver:</strong> {latestLocation.driver_name}</p>
-          <p><strong>Status:</strong> {latestLocation.status}</p>
-          <p><strong>Last Updated:</strong> {latestLocation.last_updated}</p>
-        </div>
-      )}
     </main>
   );
 }

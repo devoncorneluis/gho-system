@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import AdminLayout from "../../components/AdminLayout";
 
 const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
 
@@ -21,6 +22,7 @@ type Driver = {
   email: string | null;
   license_number: string | null;
   pdp_number: string | null;
+  driver_photo: string | null;
   assigned_vehicle: string | null;
   assigned_vehicle_id: string | null;
   status: string | null;
@@ -160,7 +162,8 @@ export default function DriversPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
+    <AdminLayout>
+      <main className="min-h-screen bg-gray-100 p-6">
       <h1 className="text-4xl font-bold text-[#061B33]">Drivers</h1>
 
       <p className="text-gray-600 mt-2">
@@ -254,33 +257,66 @@ export default function DriversPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow p-6 mt-6 overflow-x-auto">
+      <div className="bg-white rounded-xl shadow p-6 mt-6">
         <h2 className="text-xl font-bold mb-4">Driver List</h2>
 
-        <div className="grid grid-cols-7 font-bold border-b pb-2 min-w-[1000px]">
-          <p>Code</p>
-          <p>Name</p>
-          <p>Phone</p>
-          <p>Assigned Vehicle</p>
-          <p>Status</p>
-          <p>Availability</p>
-          <p>Action</p>
-        </div>
+        {drivers.length === 0 ? (
+          <p className="text-gray-500">No drivers available yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {drivers.map((driver) => (
+              <div key={driver.id ?? driver.driver_no} className="border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow bg-slate-50">
+                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                  <div className="w-28 h-28 rounded-3xl overflow-hidden bg-gray-200 flex items-center justify-center">
+                    {driver.driver_photo ? (
+                      <img
+                        src={driver.driver_photo}
+                        alt={driver.full_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-4xl">📷</span>
+                    )}
+                  </div>
 
-        {drivers.map((driver) => (
-          <div key={driver.id} className="grid grid-cols-7 py-3 border-b min-w-[1000px] items-center">
-            <p>{driver.driver_code || driver.driver_no}</p>
-            <p>{driver.full_name}</p>
-            <p>{driver.phone}</p>
-            <p>{driver.assigned_vehicle || vehicleLabel(driver.assigned_vehicle_id)}</p>
-            <p>{driver.status}</p>
-            <p>{driver.availability_status}</p>
-            <button onClick={() => setEditingDriver(driver)} className="bg-[#061B33] text-white px-4 py-2 rounded-lg font-bold">
-              Edit
-            </button>
+                  <div className="flex-1">
+                    <p className="text-2xl font-bold text-[#061B33]">{driver.full_name}</p>
+                    <p className="text-gray-600">{driver.driver_code || driver.driver_no}</p>
+                    <p className="text-gray-500 mt-2">{vehicleLabel(driver.assigned_vehicle_id)}</p>
+                  </div>
+
+                  <div className="flex flex-col gap-2 text-right">
+                    <button
+                      onClick={() => setEditingDriver(driver)}
+                      className="self-end bg-[#061B33] text-white px-5 py-2 rounded-full font-bold"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 text-sm text-gray-700">
+                  <div className="rounded-2xl bg-white p-4 border">
+                    <p className="text-sm text-gray-500">Vehicle</p>
+                    <p className="font-semibold">{driver.assigned_vehicle || vehicleLabel(driver.assigned_vehicle_id)}</p>
+                  </div>
+
+                  <div className="rounded-2xl bg-white p-4 border">
+                    <p className="text-sm text-gray-500">Status</p>
+                    <p className="font-semibold">{driver.status || "Unknown"}</p>
+                  </div>
+
+                  <div className="rounded-2xl bg-white p-4 border">
+                    <p className="text-sm text-gray-500">Availability</p>
+                    <p className="font-semibold">{driver.availability_status || "Unknown"}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
-    </main>
+      </main>
+    </AdminLayout>
   );
 }

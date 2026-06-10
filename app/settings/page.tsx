@@ -1,6 +1,9 @@
+import AdminLayout from "../../components/AdminLayout";
+
 export default function SettingsPage() {
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
+    <AdminLayout>
+      <main className="min-h-screen bg-gray-100 p-6">
       <h1 className="text-4xl font-bold text-[#061B33]">
         Settings
       </h1>
@@ -30,6 +33,7 @@ export default function SettingsPage() {
           <p className="text-gray-600 mt-2">Track who changed trips, drivers, agents, and reports.</p>
         </div>
       </div>
-    </main>
+      </main>
+    </AdminLayout>
   );
 }

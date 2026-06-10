@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import AdminLayout from "../../components/AdminLayout";
 
 const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
 
@@ -82,7 +83,8 @@ export default function AgentsPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
+    <AdminLayout>
+      <main className="min-h-screen bg-gray-100 p-6">
       <h1 className="text-4xl font-bold text-[#061B33]">Agents</h1>
 
       <p className="text-gray-600 mt-2">
@@ -129,6 +131,7 @@ export default function AgentsPage() {
           </div>
         ))}
       </div>
-    </main>
+      </main>
+    </AdminLayout>
   );
 }
