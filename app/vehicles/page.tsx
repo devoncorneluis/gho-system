@@ -25,6 +25,7 @@ export default function VehiclesPage() {
   const [colour, setColour] = useState("");
   const [passengerLimit, setPassengerLimit] = useState("");
   const [vehiclePhoto, setVehiclePhoto] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   async function loadVehicles() {
     const { data, error } = await supabase
@@ -39,6 +40,37 @@ export default function VehiclesPage() {
     }
 
     setVehicles(data || []);
+  }
+
+  async function uploadVehiclePhoto(file: File) {
+    setUploading(true);
+
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2)}.${fileExt}`;
+
+    const filePath = `${PLATFORM_ID}/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from("vehicle-photos")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (error) {
+      alert(error.message);
+      setUploading(false);
+      return;
+    }
+
+    const { data } = supabase.storage
+      .from("vehicle-photos")
+      .getPublicUrl(filePath);
+
+    setVehiclePhoto(data.publicUrl);
+    setUploading(false);
   }
 
   async function saveVehicle() {
@@ -130,12 +162,34 @@ export default function VehiclesPage() {
               placeholder="Passenger Limit"
             />
 
-            <input
-              value={vehiclePhoto}
-              onChange={(e) => setVehiclePhoto(e.target.value)}
-              className="border p-3 rounded-lg"
-              placeholder="Vehicle Photo URL"
-            />
+            <div className="border rounded-lg p-3">
+              <label className="block font-bold text-[#061B33] mb-2">
+                Vehicle Photo
+              </label>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadVehiclePhoto(file);
+                }}
+              />
+
+              {uploading && (
+                <p className="text-orange-500 font-bold mt-2">
+                  Uploading photo...
+                </p>
+              )}
+
+              {vehiclePhoto && (
+                <img
+                  src={vehiclePhoto}
+                  alt="Vehicle preview"
+                  className="mt-3 w-full h-40 object-cover rounded-lg border"
+                />
+              )}
+            </div>
           </div>
 
           <button

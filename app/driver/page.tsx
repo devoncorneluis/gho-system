@@ -118,6 +118,15 @@ export default function DriverPage() {
         last_updated: new Date().toISOString(),
       });
     }
+
+    await supabase.from("driver_location_history").insert({
+      platform_id: PLATFORM_ID,
+      driver_name: driver.full_name,
+      latitude,
+      longitude,
+      speed: null,
+      recorded_at: new Date().toISOString(),
+    });
   }
 
   function startGpsTracking() {
