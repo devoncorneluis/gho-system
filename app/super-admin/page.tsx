@@ -157,6 +157,20 @@ export default function SuperAdminPage() {
     loadPlatformAdmins();
   }
 
+  async function updatePlatformAdminStatus(adminId: string, status: string) {
+    const { error } = await supabase
+      .from("user_profiles")
+      .update({ status })
+      .eq("id", adminId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    loadPlatformAdmins();
+  }
+
   async function savePlatformSettings() {
     if (!editingPlatform) return;
 
@@ -461,12 +475,30 @@ export default function SuperAdminPage() {
                   <p><strong>Platform:</strong> {platform?.name || admin.platform_id}</p>
                   <p><strong>Password Note:</strong> {admin.password_note || "None"}</p>
 
-                  <button
-                    onClick={() => deletePlatformAdmin(admin.id)}
-                    className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg font-bold"
-                  >
-                    Delete Admin
-                  </button>
+                  <div className="flex gap-2 mt-4">
+                    {admin.status === "Active" ? (
+                      <button
+                        onClick={() => updatePlatformAdminStatus(admin.id, "Inactive")}
+                        className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold"
+                      >
+                        Deactivate Admin
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => updatePlatformAdminStatus(admin.id, "Active")}
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold"
+                      >
+                        Activate Admin
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => deletePlatformAdmin(admin.id)}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold"
+                    >
+                      Delete Admin
+                    </button>
+                  </div>
                 </div>
               );
             })}
