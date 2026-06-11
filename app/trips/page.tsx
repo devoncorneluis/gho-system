@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
+import { getUserPlatform } from "../../lib/getUserPlatform";
 
-const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
+
 
 type Trip = {
   id: string;
@@ -27,12 +28,15 @@ type Trip = {
 export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [search, setSearch] = useState("");
+  const [platformId, setPlatformId] = useState<string | null>(null);
 
   async function loadTrips() {
+    if (!platformId) return;
+
     const { data, error } = await supabase
       .from("trips")
       .select("*")
-      .eq("platform_id", PLATFORM_ID)
+      .eq("platform_id", platformId)
       .order("trip_date", { ascending: false });
 
     if (error) {
@@ -44,6 +48,11 @@ export default function TripsPage() {
   }
 
   async function updateTrip(trip: Trip, status?: string) {
+    if (!platformId) {
+      alert("Platform not loaded yet.");
+      return;
+    }
+
     const { error } = await supabase
       .from("trips")
       .update({
@@ -67,8 +76,10 @@ export default function TripsPage() {
   }
 
   async function saveBillingReport(trip: Trip) {
+    if (!platformId) return;
+
     await supabase.from("trip_billing_reports").insert({
-      platform_id: PLATFORM_ID,
+      platform_id: platformId,
       trip_id: trip.id,
       trip_code: trip.trip_code,
       trip_date: trip.trip_date,
@@ -89,8 +100,25 @@ export default function TripsPage() {
   }
 
   useEffect(() => {
-    loadTrips();
+    async function setupPage() {
+      const userPlatform = await getUserPlatform();
+
+      if (!userPlatform) {
+        window.location.href = "/login";
+        return;
+      }
+
+      setPlatformId(userPlatform.platformId);
+    }
+
+    setupPage();
   }, []);
+
+  useEffect(() => {
+    if (!platformId) return;
+
+    loadTrips();
+  }, [platformId]);
 
   const filteredTrips = trips.filter((trip) => {
     const text = `${trip.trip_code} ${trip.area} ${trip.driver_name} ${trip.vehicle_name} ${trip.vehicle_registration} ${trip.status}`.toLowerCase();
