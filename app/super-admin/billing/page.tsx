@@ -1,4 +1,3 @@
-cat > app/super-admin/billing/page.tsx <<'EOF'
 "use client";
 
 export default function SuperAdminBillingPage() {
