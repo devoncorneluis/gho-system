@@ -1,8 +1,261 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import AdminLayout from "../../components/AdminLayout";
+import { supabase } from "../../lib/supabase";
+
+const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
+
+type Trip = {
+  id: string;
+  platform_id: string;
+  trip_code: string;
+  trip_date: string | null;
+  shift: string | null;
+  area: string | null;
+  pickup_time: string | null;
+  dropoff_time: string | null;
+  vehicle_type: string | null;
+  passenger_count: number | null;
+  driver_name: string | null;
+  status: string | null;
+  created_at: string | null;
+  vehicle_name: string | null;
+  vehicle_registration: string | null;
+};
+
 export default function TripsPage() {
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [search, setSearch] = useState("");
+
+  async function loadTrips() {
+    const { data, error } = await supabase
+      .from("trips")
+      .select("*")
+      .eq("platform_id", PLATFORM_ID)
+      .order("trip_date", { ascending: false });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setTrips(data || []);
+  }
+
+  async function updateTrip(trip: Trip, status?: string) {
+    const { error } = await supabase
+      .from("trips")
+      .update({
+        driver_name: trip.driver_name,
+        vehicle_name: trip.vehicle_name,
+        vehicle_registration: trip.vehicle_registration,
+        status: status || trip.status,
+      })
+      .eq("id", trip.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    if ((status || trip.status) === "Completed") {
+      await saveBillingReport(trip);
+    }
+
+    loadTrips();
+  }
+
+  async function saveBillingReport(trip: Trip) {
+    await supabase.from("trip_billing_reports").insert({
+      platform_id: PLATFORM_ID,
+      trip_id: trip.id,
+      trip_code: trip.trip_code,
+      trip_date: trip.trip_date,
+      company_name: "GHO",
+      client_name: trip.area,
+      area: trip.area,
+      pickup_time: trip.pickup_time,
+      dropoff_time: trip.dropoff_time,
+      driver_name: trip.driver_name,
+      vehicle_name: trip.vehicle_name,
+      vehicle_registration: trip.vehicle_registration,
+      passenger_count: trip.passenger_count,
+      trip_status: "Completed",
+      billing_status: "Unbilled",
+      billing_amount: 0,
+      notes: "Auto-saved when trip was completed.",
+    });
+  }
+
+  useEffect(() => {
+    loadTrips();
+  }, []);
+
+  const filteredTrips = trips.filter((trip) => {
+    const text = `${trip.trip_code} ${trip.area} ${trip.driver_name} ${trip.vehicle_name} ${trip.vehicle_registration} ${trip.status}`.toLowerCase();
+    return text.includes(search.toLowerCase());
+  });
+
+  const confirmedTrips = trips.filter((trip) => trip.status === "Confirmed").length;
+  const inProgressTrips = trips.filter((trip) => trip.status === "In Progress").length;
+  const completedTrips = trips.filter((trip) => trip.status === "Completed").length;
+
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
-      <h1 className="text-4xl font-bold text-[#061B33]">Trips</h1>
-      <p className="mt-4">Trips page restored.</p>
-    </main>
+    <AdminLayout>
+      <main className="min-h-screen bg-gray-100 p-6">
+        <h1 className="text-4xl font-bold text-[#061B33]">
+          Trips Management
+        </h1>
+
+        <p className="text-gray-600 mt-2">
+          Calendar-generated trips appear here for driver, vehicle, and billing management.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+          <div className="bg-white rounded-xl shadow p-5">
+            <p className="font-bold text-gray-600">Total Trips</p>
+            <p className="text-4xl font-bold text-[#061B33]">{trips.length}</p>
+          </div>
+
+          <div className="bg-orange-50 rounded-xl shadow p-5">
+            <p className="font-bold text-gray-600">Confirmed</p>
+            <p className="text-4xl font-bold text-orange-500">{confirmedTrips}</p>
+          </div>
+
+          <div className="bg-blue-50 rounded-xl shadow p-5">
+            <p className="font-bold text-gray-600">In Progress</p>
+            <p className="text-4xl font-bold text-blue-600">{inProgressTrips}</p>
+          </div>
+
+          <div className="bg-green-50 rounded-xl shadow p-5">
+            <p className="font-bold text-gray-600">Completed</p>
+            <p className="text-4xl font-bold text-green-600">{completedTrips}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6 mt-6">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border p-3 rounded-lg w-full"
+            placeholder="Search trips by area, driver, vehicle, status..."
+          />
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6 mt-6">
+          <h2 className="text-xl font-bold mb-4">Trip List</h2>
+
+          {filteredTrips.length === 0 && (
+            <p className="text-gray-500">No trips found.</p>
+          )}
+
+          <div className="space-y-4">
+            {filteredTrips.map((trip) => (
+              <div key={trip.id} className="border rounded-2xl p-5 bg-slate-50">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                  <div>
+                    <p className="text-2xl font-bold text-[#061B33]">
+                      🚐 {trip.trip_code}
+                    </p>
+                    <p><strong>Date:</strong> {trip.trip_date}</p>
+                    <p><strong>Shift:</strong> {trip.shift}</p>
+                    <p><strong>Area:</strong> {trip.area}</p>
+                    <p><strong>Pickup:</strong> {trip.pickup_time}</p>
+                    <p><strong>Drop-off:</strong> {trip.dropoff_time}</p>
+                    <p><strong>Passengers:</strong> {trip.passenger_count}</p>
+                    <p><strong>Status:</strong> {trip.status}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 w-full md:max-w-md">
+                    <input
+                      value={trip.driver_name || ""}
+                      onChange={(e) =>
+                        setTrips((current) =>
+                          current.map((item) =>
+                            item.id === trip.id
+                              ? { ...item, driver_name: e.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      className="border p-3 rounded-lg"
+                      placeholder="Driver name"
+                    />
+
+                    <input
+                      value={trip.vehicle_name || ""}
+                      onChange={(e) =>
+                        setTrips((current) =>
+                          current.map((item) =>
+                            item.id === trip.id
+                              ? { ...item, vehicle_name: e.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      className="border p-3 rounded-lg"
+                      placeholder="Vehicle name"
+                    />
+
+                    <input
+                      value={trip.vehicle_registration || ""}
+                      onChange={(e) =>
+                        setTrips((current) =>
+                          current.map((item) =>
+                            item.id === trip.id
+                              ? { ...item, vehicle_registration: e.target.value }
+                              : item
+                          )
+                        )
+                      }
+                      className="border p-3 rounded-lg"
+                      placeholder="Vehicle registration"
+                    />
+
+                    <button
+                      onClick={() => updateTrip(trip)}
+                      className="bg-[#061B33] text-white px-5 py-3 rounded-lg font-bold"
+                    >
+                      Save Driver & Vehicle
+                    </button>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        onClick={() => updateTrip(trip, "In Progress")}
+                        className="bg-blue-600 text-white px-3 py-2 rounded-lg font-bold"
+                      >
+                        Start
+                      </button>
+
+                      <button
+                        onClick={() => updateTrip(trip, "Completed")}
+                        className="bg-green-600 text-white px-3 py-2 rounded-lg font-bold"
+                      >
+                        Complete
+                      </button>
+
+                      <button
+                        onClick={() => updateTrip(trip, "Cancelled")}
+                        className="bg-red-600 text-white px-3 py-2 rounded-lg font-bold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 bg-white rounded-xl border p-4">
+                  <p className="font-bold text-[#061B33]">Assigned Unit</p>
+                  <p>👤 Driver: {trip.driver_name || "Not assigned"}</p>
+                  <p>🚐 Vehicle: {trip.vehicle_name || trip.vehicle_type || "Not assigned"}</p>
+                  <p>🔢 Registration: {trip.vehicle_registration || "Not assigned"}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+    </AdminLayout>
   );
 }
