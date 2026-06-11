@@ -14,6 +14,11 @@ type Platform = {
   package_name: string | null;
   status: string | null;
   created_at: string | null;
+  billing_frequency: string | null;
+  invoice_day: number | null;
+  payment_terms: string | null;
+  contract_rate: number | null;
+  contract_type: string | null;
 };
 
 type PlatformAdmin = {
@@ -42,6 +47,7 @@ export default function SuperAdminPage() {
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPasswordNote, setAdminPasswordNote] = useState("");
+  const [editingPlatform, setEditingPlatform] = useState<Platform | null>(null);
 
   async function loadPlatforms() {
     const { data, error } = await supabase
@@ -131,6 +137,32 @@ export default function SuperAdminPage() {
     setAdminPasswordNote("");
 
     loadPlatformAdmins();
+  }
+
+  async function savePlatformSettings() {
+    if (!editingPlatform) return;
+
+    const { error } = await supabase
+      .from("platforms")
+      .update({
+        company_name: editingPlatform.company_name,
+        package_name: editingPlatform.package_name,
+        status: editingPlatform.status,
+        billing_frequency: editingPlatform.billing_frequency,
+        invoice_day: editingPlatform.invoice_day,
+        payment_terms: editingPlatform.payment_terms,
+        contract_type: editingPlatform.contract_type,
+        contract_rate: editingPlatform.contract_rate,
+      })
+      .eq("id", editingPlatform.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setEditingPlatform(null);
+    loadPlatforms();
   }
 
   useEffect(() => {
@@ -231,6 +263,108 @@ export default function SuperAdminPage() {
           </button>
         </div>
 
+        {editingPlatform && (
+          <div className="bg-white rounded-xl shadow p-6 mt-6 border-2 border-orange-500">
+            <h2 className="text-xl font-bold mb-4 text-[#061B33]">
+              Edit Platform Settings: {editingPlatform.name}
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                value={editingPlatform.company_name || ""}
+                onChange={(e) => setEditingPlatform({ ...editingPlatform, company_name: e.target.value })}
+                className="border p-3 rounded-lg"
+                placeholder="Company Name"
+              />
+
+              <select
+                value={editingPlatform.package_name || "Starter"}
+                onChange={(e) => setEditingPlatform({ ...editingPlatform, package_name: e.target.value })}
+                className="border p-3 rounded-lg"
+              >
+                <option>Starter</option>
+                <option>Professional</option>
+                <option>Enterprise</option>
+              </select>
+
+              <select
+                value={editingPlatform.status || "Active"}
+                onChange={(e) => setEditingPlatform({ ...editingPlatform, status: e.target.value })}
+                className="border p-3 rounded-lg"
+              >
+                <option>Active</option>
+                <option>Suspended</option>
+                <option>Pending</option>
+                <option>Archived</option>
+              </select>
+
+              <select
+                value={editingPlatform.billing_frequency || "Bi-Weekly"}
+                onChange={(e) => setEditingPlatform({ ...editingPlatform, billing_frequency: e.target.value })}
+                className="border p-3 rounded-lg"
+              >
+                <option>Weekly</option>
+                <option>Bi-Weekly</option>
+                <option>Monthly</option>
+                <option>Custom</option>
+              </select>
+
+              <input
+                type="number"
+                value={editingPlatform.invoice_day || 8}
+                onChange={(e) => setEditingPlatform({ ...editingPlatform, invoice_day: Number(e.target.value) })}
+                className="border p-3 rounded-lg"
+                placeholder="Invoice Day"
+              />
+
+              <select
+                value={editingPlatform.payment_terms || "30 Days"}
+                onChange={(e) => setEditingPlatform({ ...editingPlatform, payment_terms: e.target.value })}
+                className="border p-3 rounded-lg"
+              >
+                <option>7 Days</option>
+                <option>15 Days</option>
+                <option>30 Days</option>
+                <option>60 Days</option>
+              </select>
+
+              <select
+                value={editingPlatform.contract_type || "Per Trip"}
+                onChange={(e) => setEditingPlatform({ ...editingPlatform, contract_type: e.target.value })}
+                className="border p-3 rounded-lg"
+              >
+                <option>Per Trip</option>
+                <option>Fixed Contract</option>
+                <option>Custom</option>
+              </select>
+
+              <input
+                type="number"
+                value={editingPlatform.contract_rate || 0}
+                onChange={(e) => setEditingPlatform({ ...editingPlatform, contract_rate: Number(e.target.value) })}
+                className="border p-3 rounded-lg"
+                placeholder="Contract Rate"
+              />
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={savePlatformSettings}
+                className="bg-green-600 text-white px-5 py-3 rounded-lg font-bold"
+              >
+                Save Settings
+              </button>
+
+              <button
+                onClick={() => setEditingPlatform(null)}
+                className="bg-gray-600 text-white px-5 py-3 rounded-lg font-bold"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow p-6 mt-6">
           <h2 className="text-xl font-bold mb-4">Platforms</h2>
 
@@ -250,9 +384,29 @@ export default function SuperAdminPage() {
                 <p><strong>Phone:</strong> {platform.contact_phone}</p>
                 <p><strong>Package:</strong> {platform.package_name}</p>
                 <p><strong>Status:</strong> {platform.status}</p>
+                <p><strong>Billing:</strong> {platform.billing_frequency || "Bi-Weekly"}</p>
+                <p><strong>Invoice Day:</strong> {platform.invoice_day || 8}</p>
+                <p><strong>Payment Terms:</strong> {platform.payment_terms || "30 Days"}</p>
+                <p><strong>Contract:</strong> {platform.contract_type || "Per Trip"} - R{platform.contract_rate || 0}</p>
                 <p className="text-xs text-gray-500 mt-2">
                   Platform ID: {platform.id}
                 </p>
+
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => setEditingPlatform(platform)}
+                    className="bg-[#061B33] text-white px-4 py-2 rounded-lg font-bold"
+                  >
+                    ⚙ Edit Settings
+                  </button>
+
+                  <a
+                    href="/super-admin/billing"
+                    className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold"
+                  >
+                    💳 Billing
+                  </a>
+                </div>
               </div>
             ))}
           </div>
