@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { getUserPlatform } from "../../lib/getUserPlatform";
 import AdminLayout from "../../components/AdminLayout";
 
-const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
+
 
 type Vehicle = {
   id: string;
@@ -44,12 +45,15 @@ export default function DriversPage() {
   const [assignedVehicleId, setAssignedVehicleId] = useState("");
   const [driverPhoto, setDriverPhoto] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [platformId, setPlatformId] = useState<string | null>(null);
 
   async function loadDrivers() {
+    if (!platformId) return;
+
     const { data, error } = await supabase
       .from("drivers")
       .select("*")
-      .eq("platform_id", PLATFORM_ID)
+      .eq("platform_id", platformId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -61,10 +65,12 @@ export default function DriversPage() {
   }
 
   async function loadVehicles() {
+    if (!platformId) return;
+
     const { data, error } = await supabase
       .from("vehicles")
       .select("id, vehicle_code, vehicle_name, registration_number")
-      .eq("platform_id", PLATFORM_ID)
+      .eq("platform_id", platformId)
       .order("vehicle_name");
 
     if (error) {
@@ -89,7 +95,7 @@ export default function DriversPage() {
       .toString(36)
       .substring(2)}.${fileExt}`;
 
-    const filePath = `${PLATFORM_ID}/${fileName}`;
+    const filePath = `${platformId}/${fileName}`;
 
     const { error } = await supabase.storage
       .from("driver-photos")
@@ -113,6 +119,11 @@ export default function DriversPage() {
   }
 
   async function saveDriver() {
+    if (!platformId) {
+      alert("Platform not loaded yet.");
+      return;
+    }
+
     if (!driverNo || !name || !assignedVehicleId) {
       alert("Driver Number, Full Name, and Vehicle are required");
       return;
@@ -121,7 +132,7 @@ export default function DriversPage() {
     const selectedVehicle = vehicles.find((vehicle) => vehicle.id === assignedVehicleId);
 
     const { error } = await supabase.from("drivers").insert({
-      platform_id: PLATFORM_ID,
+      platform_id: platformId,
       driver_no: driverNo,
       driver_code: driverCode,
       full_name: name,
@@ -157,6 +168,11 @@ export default function DriversPage() {
   }
 
   async function saveDriverChanges() {
+    if (!platformId) {
+      alert("Platform not loaded yet.");
+      return;
+    }
+
     if (!editingDriver) return;
 
     const selectedVehicle = vehicles.find(
@@ -193,9 +209,26 @@ export default function DriversPage() {
   }
 
   useEffect(() => {
+    async function setupPage() {
+      const userPlatform = await getUserPlatform();
+
+      if (!userPlatform) {
+        window.location.href = "/login";
+        return;
+      }
+
+      setPlatformId(userPlatform.platformId);
+    }
+
+    setupPage();
+  }, []);
+
+  useEffect(() => {
+    if (!platformId) return;
+
     loadDrivers();
     loadVehicles();
-  }, []);
+  }, [platformId]);
 
   return (
     <AdminLayout>
@@ -239,7 +272,7 @@ export default function DriversPage() {
                     const fileName = `${Date.now()}-${Math.random()
                       .toString(36)
                       .substring(2)}.${fileExt}`;
-                    const filePath = `${PLATFORM_ID}/${fileName}`;
+                    const filePath = `${platformId}/${fileName}`;
 
                     const { error } = await supabase.storage
                       .from("driver-photos")

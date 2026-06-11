@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
+import { getUserPlatform } from "../../lib/getUserPlatform";
 
-const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
+
 
 type Trip = { id: string; status: string | null };
 type Driver = { id: string; availability_status: string | null };
@@ -64,11 +65,20 @@ export default function AdminPage() {
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
 
   async function loadDashboard() {
-    const { data: tripData } = await supabase.from("trips").select("id, status").eq("platform_id", PLATFORM_ID);
-    const { data: driverData } = await supabase.from("drivers").select("id, availability_status").eq("platform_id", PLATFORM_ID);
-    const { data: vehicleData } = await supabase.from("vehicles").select("id, status").eq("platform_id", PLATFORM_ID);
-    const { data: passengerData } = await supabase.from("trip_passengers").select("id, pickup_status").eq("platform_id", PLATFORM_ID);
-    const { data: alertData } = await supabase.from("emergency_alerts").select("id, status").eq("platform_id", PLATFORM_ID);
+    const userPlatform = await getUserPlatform();
+
+    if (!userPlatform) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const platformId = userPlatform.platformId;
+
+    const { data: tripData } = await supabase.from("trips").select("id, status").eq("platform_id", platformId);
+    const { data: driverData } = await supabase.from("drivers").select("id, availability_status").eq("platform_id", platformId);
+    const { data: vehicleData } = await supabase.from("vehicles").select("id, status").eq("platform_id", platformId);
+    const { data: passengerData } = await supabase.from("trip_passengers").select("id, pickup_status").eq("platform_id", platformId);
+    const { data: alertData } = await supabase.from("emergency_alerts").select("id, status").eq("platform_id", platformId);
 
     setTrips(tripData || []);
     setDrivers(driverData || []);
