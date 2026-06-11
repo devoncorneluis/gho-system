@@ -1,4 +1,3 @@
-Control + C
 cat > app/super-admin/billing/page.tsx <<'EOF'
 "use client";
 
