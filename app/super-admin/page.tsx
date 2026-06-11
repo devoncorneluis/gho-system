@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import AdminLayout from "../../components/AdminLayout";
+import SuperAdminLayout from "../../components/SuperAdminLayout";
 import { supabase } from "../../lib/supabase";
 
 type Platform = {
@@ -138,8 +138,13 @@ export default function SuperAdminPage() {
     loadPlatformAdmins();
   }, []);
 
+  const activePlatforms = platforms.filter((platform) => platform.status === "Active").length;
+  const starterPlatforms = platforms.filter((platform) => platform.package_name === "Starter").length;
+  const professionalPlatforms = platforms.filter((platform) => platform.package_name === "Professional").length;
+  const enterprisePlatforms = platforms.filter((platform) => platform.package_name === "Enterprise").length;
+
   return (
-    <AdminLayout>
+    <SuperAdminLayout>
       <main className="min-h-screen bg-gray-100 p-6">
         <h1 className="text-4xl font-bold text-[#061B33]">
           Super Admin Portal
@@ -148,6 +153,38 @@ export default function SuperAdminPage() {
         <p className="text-gray-600 mt-2">
           Create and manage client platforms for Corneluis Group Pty Ltd.
         </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
+          <div className="bg-white rounded-xl shadow p-5">
+            <p className="font-bold text-gray-600">Total Platforms</p>
+            <p className="text-4xl font-black text-[#061B33]">{platforms.length}</p>
+          </div>
+
+          <div className="bg-green-50 rounded-xl shadow p-5">
+            <p className="font-bold text-gray-600">Active Platforms</p>
+            <p className="text-4xl font-black text-green-600">{activePlatforms}</p>
+          </div>
+
+          <div className="bg-orange-50 rounded-xl shadow p-5">
+            <p className="font-bold text-gray-600">Platform Admins</p>
+            <p className="text-4xl font-black text-orange-500">{platformAdmins.length}</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-5">
+            <p className="font-bold text-gray-600">Starter</p>
+            <p className="text-4xl font-black text-[#061B33]">{starterPlatforms}</p>
+          </div>
+
+          <div className="bg-blue-50 rounded-xl shadow p-5">
+            <p className="font-bold text-gray-600">Professional</p>
+            <p className="text-4xl font-black text-blue-600">{professionalPlatforms}</p>
+          </div>
+
+          <div className="bg-purple-50 rounded-xl shadow p-5">
+            <p className="font-bold text-gray-600">Enterprise</p>
+            <p className="text-4xl font-black text-purple-600">{enterprisePlatforms}</p>
+          </div>
+        </div>
 
         <div className="bg-white rounded-xl shadow p-6 mt-6">
           <h2 className="text-xl font-bold mb-4">Create New Platform</h2>
@@ -250,6 +287,6 @@ export default function SuperAdminPage() {
           </div>
         </div>
       </main>
-    </AdminLayout>
+    </SuperAdminLayout>
   );
 }
