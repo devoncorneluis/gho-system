@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { getUserPlatform } from "../../lib/getUserPlatform";
 import AdminLayout from "../../components/AdminLayout";
 
-const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
+
 
 type Vehicle = {
   id?: string;
@@ -26,12 +27,15 @@ export default function VehiclesPage() {
   const [passengerLimit, setPassengerLimit] = useState("");
   const [vehiclePhoto, setVehiclePhoto] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [platformId, setPlatformId] = useState<string | null>(null);
 
   async function loadVehicles() {
+    if (!platformId) return;
+
     const { data, error } = await supabase
       .from("vehicles")
       .select("*")
-      .eq("platform_id", PLATFORM_ID)
+      .eq("platform_id", platformId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -43,6 +47,11 @@ export default function VehiclesPage() {
   }
 
   async function uploadVehiclePhoto(file: File) {
+    if (!platformId) {
+      alert("Platform not loaded yet.");
+      return;
+    }
+
     setUploading(true);
 
     const fileExt = file.name.split(".").pop();
@@ -50,7 +59,7 @@ export default function VehiclesPage() {
       .toString(36)
       .substring(2)}.${fileExt}`;
 
-    const filePath = `${PLATFORM_ID}/${fileName}`;
+    const filePath = `${platformId}/${fileName}`;
 
     const { error } = await supabase.storage
       .from("vehicle-photos")
@@ -74,13 +83,18 @@ export default function VehiclesPage() {
   }
 
   async function saveVehicle() {
+    if (!platformId) {
+      alert("Platform not loaded yet.");
+      return;
+    }
+
     if (!name || !registration) {
       alert("Please enter Vehicle Name and Registration Number");
       return;
     }
 
     const { error } = await supabase.from("vehicles").insert({
-      platform_id: PLATFORM_ID,
+      platform_id: platformId,
       vehicle_name: name,
       registration_number: registration,
       vehicle_type: type,
@@ -106,8 +120,25 @@ export default function VehiclesPage() {
   }
 
   useEffect(() => {
-    loadVehicles();
+    async function setupPage() {
+      const userPlatform = await getUserPlatform();
+
+      if (!userPlatform) {
+        window.location.href = "/login";
+        return;
+      }
+
+      setPlatformId(userPlatform.platformId);
+    }
+
+    setupPage();
   }, []);
+
+  useEffect(() => {
+    if (!platformId) return;
+
+    loadVehicles();
+  }, [platformId]);
 
   return (
     <AdminLayout>
