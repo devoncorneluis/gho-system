@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { getUserPlatform } from "../../lib/getUserPlatform";
 import AdminLayout from "../../components/AdminLayout";
 
-const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
+
 
 type Agent = {
   id: string;
@@ -49,12 +50,18 @@ export default function CalendarPage() {
   const [tripDate, setTripDate] = useState("");
   const [shift, setShift] = useState("06:00 Shift");
   const [suggestedTrips, setSuggestedTrips] = useState<SuggestedTrip[]>([]);
+  const [platformId, setPlatformId] = useState<string | null>(null);
 
   async function generateTrips() {
+    if (!platformId) {
+      alert("Platform not loaded yet.");
+      return;
+    }
+
     const { data, error } = await supabase
       .from("agents")
       .select("*")
-      .eq("platform_id", PLATFORM_ID)
+      .eq("platform_id", platformId)
       .eq("status", "Active");
 
     if (error) {
@@ -102,6 +109,11 @@ export default function CalendarPage() {
   }
 
   async function confirmTrips() {
+    if (!platformId) {
+      alert("Platform not loaded yet.");
+      return;
+    }
+
     if (!tripDate) {
       alert("Please select a date first");
       return;
@@ -113,7 +125,7 @@ export default function CalendarPage() {
     }
 
     const tripsToSave = suggestedTrips.map((trip) => ({
-      platform_id: PLATFORM_ID,
+      platform_id: platformId,
       trip_code: trip.trip_code,
       trip_date: tripDate,
       shift,
@@ -135,6 +147,21 @@ export default function CalendarPage() {
 
     setConfirmed(true);
   }
+
+  useEffect(() => {
+    async function setupPage() {
+      const userPlatform = await getUserPlatform();
+
+      if (!userPlatform) {
+        window.location.href = "/login";
+        return;
+      }
+
+      setPlatformId(userPlatform.platformId);
+    }
+
+    setupPage();
+  }, []);
 
   return (
     <AdminLayout>
