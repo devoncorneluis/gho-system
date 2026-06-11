@@ -139,6 +139,24 @@ export default function SuperAdminPage() {
     loadPlatformAdmins();
   }
 
+  async function deletePlatformAdmin(adminId: string) {
+    const confirmDelete = confirm("Are you sure you want to delete this platform admin profile?");
+
+    if (!confirmDelete) return;
+
+    const { error } = await supabase
+      .from("user_profiles")
+      .delete()
+      .eq("id", adminId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    loadPlatformAdmins();
+  }
+
   async function savePlatformSettings() {
     if (!editingPlatform) return;
 
@@ -178,6 +196,13 @@ export default function SuperAdminPage() {
   return (
     <SuperAdminLayout>
       <main className="min-h-screen bg-gray-100 p-6">
+        <button
+          onClick={() => window.location.href = "/admin"}
+          className="mb-4 bg-gray-700 text-white px-4 py-2 rounded-lg font-bold"
+        >
+          ← Back to Dashboard
+        </button>
+
         <h1 className="text-4xl font-bold text-[#061B33]">
           Super Admin Portal
         </h1>
@@ -435,6 +460,13 @@ export default function SuperAdminPage() {
                   <p><strong>Status:</strong> {admin.status}</p>
                   <p><strong>Platform:</strong> {platform?.name || admin.platform_id}</p>
                   <p><strong>Password Note:</strong> {admin.password_note || "None"}</p>
+
+                  <button
+                    onClick={() => deletePlatformAdmin(admin.id)}
+                    className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg font-bold"
+                  >
+                    Delete Admin
+                  </button>
                 </div>
               );
             })}
