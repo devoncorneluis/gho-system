@@ -48,6 +48,15 @@ export default function SuperAdminInvoicesPage() {
           Generate, track, and manage company invoices.
         </p>
 
+        <div className="mt-6">
+          <button
+            className="bg-orange-500 text-white px-6 py-3 rounded-lg font-bold"
+            onClick={() => alert("Generate Invoice Coming Next")}
+          >
+            ➕ Generate Invoice
+          </button>
+        </div>
+
         <div className="bg-white rounded-2xl shadow p-6 mt-6">
           {invoices.length === 0 ? (
             <p className="text-gray-500">No invoices generated yet.</p>
