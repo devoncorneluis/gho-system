@@ -11,6 +11,8 @@ type Agent = {
   id: string;
   employee_no: string;
   full_name: string;
+  email: string | null;
+  phone: string | null;
   home_area: string | null;
   shift_start: string | null;
   shift_end: string | null;
@@ -24,6 +26,7 @@ type SuggestedTrip = {
   dropoff_time: string;
   vehicle_type: string;
   passenger_count: number;
+  agents: Agent[];
 };
 
 function chooseVehicle(passengerCount: number) {
@@ -100,6 +103,7 @@ export default function CalendarPage() {
         dropoff_time: dropoffTimeForShift(shift),
         vehicle_type: chooseVehicle(passengerCount),
         passenger_count: passengerCount,
+        agents: areaAgents,
       });
     });
 
@@ -124,25 +128,105 @@ export default function CalendarPage() {
       return;
     }
 
-    const tripsToSave = suggestedTrips.map((trip) => ({
-      platform_id: platformId,
-      trip_code: trip.trip_code,
-      trip_date: tripDate,
-      shift,
-      area: trip.area,
-      pickup_time: trip.pickup_time,
-      dropoff_time: trip.dropoff_time,
-      vehicle_type: trip.vehicle_type,
-      passenger_count: trip.passenger_count,
-      driver_name: "Not assigned",
-      status: "Confirmed",
-    }));
+    for (const trip of suggestedTrips) {
+      const { data: savedTrip, error: tripError } = await supabase
+        .from("trips")
+        .insert({
+          platform_id: platformId,
+          trip_code: trip.trip_code,
+          trip_date: tripDate,
+          shift,
+          area: trip.area,
+          pickup_time: trip.pickup_time,
+          dropoff_time: trip.dropoff_time,
+          vehicle_type: trip.vehicle_type,
+          passenger_count: trip.passenger_count,
+          driver_name: "Not assigned",
+          status: "Confirmed",
+        })
+        .select("id")
+        .single();
 
-    const { error } = await supabase.from("trips").insert(tripsToSave);
+      if (tripError || !savedTrip) {
+        alert(tripError?.message || "Trip could not be saved.");
+        return;
+      }
 
-    if (error) {
-      alert(error.message);
-      return;
+      const passengersToSave = trip.agents.map((agent) => ({
+        platform_id: platformId,
+        trip_id: savedTrip.id,
+        full_name: agent.full_name,
+        email: agent.email,
+        phone: agent.phone,
+        pickup_area: agent.home_area || trip.area,
+        pickup_address: agent.home_area || trip.area,
+        pickup_time: trip.pickup_time,
+        dropoff_time: trip.dropoff_time,
+        pickup_status: "Waiting",
+      }));
+
+      if (passengersToSave.length > 0) {
+        const { error: passengerError } = await supabase
+          .from("trip_passengers")
+          .insert(passengersToSave);
+
+        if (passengerError) {
+          alert(passengerError.message);
+          return;
+        }
+
+        const notificationRows = trip.agents.flatMap((agent) => {
+          const message = `GHO: Your transport has been created for ${tripDate}. Pickup: ${trip.pickup_time}. Area: ${trip.area}.`;
+
+          return [
+            {
+              platform_id: platformId,
+              trip_id: savedTrip.id,
+              recipient_name: agent.full_name,
+              recipient_email: agent.email,
+              recipient_phone: agent.phone,
+              whatsapp_number: agent.phone,
+              notification_type: "Trip Created",
+              channel: "In-App",
+              message,
+              status: "Pending",
+            },
+            {
+              platform_id: platformId,
+              trip_id: savedTrip.id,
+              recipient_name: agent.full_name,
+              recipient_email: agent.email,
+              recipient_phone: agent.phone,
+              whatsapp_number: agent.phone,
+              notification_type: "Trip Created",
+              channel: "Email",
+              message,
+              status: "Pending",
+            },
+            {
+              platform_id: platformId,
+              trip_id: savedTrip.id,
+              recipient_name: agent.full_name,
+              recipient_email: agent.email,
+              recipient_phone: agent.phone,
+              whatsapp_number: agent.phone,
+              notification_type: "Trip Created",
+              channel: "WhatsApp",
+              message,
+              status: "Pending",
+            },
+          ];
+        });
+
+        const { error: notificationError } = await supabase
+          .from("notification_logs")
+          .insert(notificationRows);
+
+        if (notificationError) {
+          alert(notificationError.message);
+          return;
+        }
+      }
     }
 
     setConfirmed(true);

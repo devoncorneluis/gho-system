@@ -18,34 +18,13 @@ export default function LoginPage() {
       return;
     }
 
-    let role: string | null = null;
-
-    const { data: oldProfile } = await supabase
-      .from("profiles")
+    const { data: profile } = await supabase
+      .from("user_profiles")
       .select("role")
-      .eq("id", data.user.id)
+      .eq("user_id", data.user.id)
       .maybeSingle();
 
-    if (oldProfile?.role) {
-      role = oldProfile.role;
-    }
-
-    if (!role) {
-      const { data: newProfile } = await supabase
-        .from("user_profiles")
-        .select("role")
-        .eq("user_id", data.user.id)
-        .maybeSingle();
-
-      if (newProfile?.role) {
-        role = newProfile.role;
-      }
-    }
-
-    if (!role) {
-      alert("No profile role found for this user.");
-      return;
-    }
+    const role = profile?.role;
 
     if (role === "super_admin") {
       window.location.href = "/super-admin";
@@ -67,48 +46,69 @@ export default function LoginPage() {
       return;
     }
 
-    alert("Unknown role: " + role);
+    alert("No profile role found for this user.");
   }
 
   return (
-    <main className="min-h-screen bg-[#061B33] relative flex items-center justify-center p-6 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#061B33] via-[#09294d] to-black opacity-95" />
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center text-white font-black">
+            G
+          </div>
+          <h1 className="text-3xl font-black text-[#061B33]">GHO</h1>
+        </div>
 
-      <div className="relative z-10 bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 border border-white">
-        <h1 className="text-5xl font-black text-[#061B33] text-center">
-          GHO
-        </h1>
+        <div className="space-y-6 mb-8">
+          <div className="flex items-center gap-4 text-gray-800 text-xl font-semibold">
+            <span className="text-orange-500">📍</span>
+            <span>Transport Bookings</span>
+          </div>
 
-        <p className="text-orange-500 font-bold text-center">
-          Global Handling Operations
-        </p>
+          <div className="flex items-center gap-4 text-gray-800 text-xl font-semibold">
+            <span className="text-orange-500">👤</span>
+            <span>Profile Management</span>
+          </div>
 
-        <p className="text-gray-500 text-center text-sm mb-6">
-          Powered by Corneluis Group Pty Ltd
-        </p>
+          <div className="flex items-center gap-4 text-gray-800 text-xl font-semibold">
+            <span className="text-orange-500">📊</span>
+            <span>Operations Analytics</span>
+          </div>
 
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full border rounded-xl p-3 mb-3"
-          type="email"
-          placeholder="Email address"
-        />
+          <div className="flex items-center gap-4 text-gray-800 text-xl font-semibold">
+            <span className="text-orange-500">💬</span>
+            <span>Notifications</span>
+          </div>
+        </div>
 
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full border rounded-xl p-3 mb-4"
-          type="password"
-          placeholder="Password"
-        />
+        <div className="border-t pt-6">
+          <p className="text-gray-500 font-semibold mb-4">
+            Sign in to GHO
+          </p>
 
-        <button
-          onClick={login}
-          className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold p-3 rounded-xl"
-        >
-          Login
-        </button>
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full border rounded-2xl p-4 mb-3"
+            type="email"
+            placeholder="Email address"
+          />
+
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border rounded-2xl p-4 mb-5"
+            type="password"
+            placeholder="Password"
+          />
+
+          <button
+            onClick={login}
+            className="w-full bg-black text-white font-bold p-4 rounded-2xl shadow-lg"
+          >
+            Login
+          </button>
+        </div>
       </div>
     </main>
   );
