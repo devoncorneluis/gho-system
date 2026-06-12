@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function SuperAdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+
   function logout() {
     window.location.href = "/login";
   }
@@ -18,6 +21,20 @@ export default function SuperAdminLayout({
         <p className="text-sm text-orange-400 font-bold mb-6">
           Super Admin
         </p>
+
+        <button
+          onClick={() => router.back()}
+          className="w-full bg-white text-[#061B33] rounded-xl px-4 py-3 font-bold mb-4"
+        >
+          ← Back
+        </button>
+
+        <Link
+          href="/super-admin"
+          className="block bg-orange-500 hover:bg-orange-600 rounded-xl px-4 py-3 font-bold mb-4 text-center"
+        >
+          🏠 Super Admin Home
+        </Link>
 
         <nav className="space-y-3">
           <Link href="/super-admin" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
@@ -34,6 +51,14 @@ export default function SuperAdminLayout({
 
           <Link href="/super-admin/billing" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
             💳 Billing
+          </Link>
+
+          <Link href="/super-admin/invoices" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
+            🧾 Invoices
+          </Link>
+
+          <Link href="/super-admin/audit-logs" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
+            📜 Audit Logs
           </Link>
 
           <Link href="/super-admin/reports" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
