@@ -68,11 +68,89 @@ export default function TripsPage() {
       return;
     }
 
+    if (!status) {
+      await createAssignmentNotifications(trip);
+    }
+
     if ((status || trip.status) === "Completed") {
       await saveBillingReport(trip);
     }
 
     loadTrips();
+  }
+
+  async function createAssignmentNotifications(trip: Trip) {
+    if (!platformId) return;
+
+    const { data: passengers, error: passengerError } = await supabase
+      .from("trip_passengers")
+      .select("full_name, email, phone")
+      .eq("platform_id", platformId)
+      .eq("trip_id", trip.id);
+
+    if (passengerError) {
+      alert(passengerError.message);
+      return;
+    }
+
+    if (!passengers || passengers.length === 0) {
+      return;
+    }
+
+    const baseMessage =
+      `GHO: Driver assigned for trip ${trip.trip_code}. ` +
+      `Driver: ${trip.driver_name || "Not assigned"}. ` +
+      `Vehicle: ${trip.vehicle_name || "Not assigned"} ` +
+      `${trip.vehicle_registration || ""}.`;
+
+    const notificationRows = passengers.flatMap((passenger) => {
+      return [
+        {
+          platform_id: platformId,
+          trip_id: trip.id,
+          recipient_name: passenger.full_name,
+          recipient_email: passenger.email,
+          recipient_phone: passenger.phone,
+          whatsapp_number: passenger.phone,
+          notification_type: "Driver Assigned",
+          channel: "In-App",
+          message: baseMessage,
+          status: "Pending",
+        },
+        {
+          platform_id: platformId,
+          trip_id: trip.id,
+          recipient_name: passenger.full_name,
+          recipient_email: passenger.email,
+          recipient_phone: passenger.phone,
+          whatsapp_number: passenger.phone,
+          notification_type: "Driver Assigned",
+          channel: "Email",
+          message: baseMessage,
+          status: "Pending",
+        },
+        {
+          platform_id: platformId,
+          trip_id: trip.id,
+          recipient_name: passenger.full_name,
+          recipient_email: passenger.email,
+          recipient_phone: passenger.phone,
+          whatsapp_number: passenger.phone,
+          notification_type: "Driver Assigned",
+          channel: "WhatsApp",
+          message: baseMessage,
+          status: "Pending",
+        },
+      ];
+    });
+
+    const { error } = await supabase
+      .from("notification_logs")
+      .insert(notificationRows);
+
+    if (error) {
+      alert(error.message);
+    }
   }
 
   async function saveBillingReport(trip: Trip) {
