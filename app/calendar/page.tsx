@@ -152,6 +152,8 @@ export default function CalendarPage() {
         return;
       }
 
+      alert(`Creating passengers for ${trip.trip_code}. Agents found: ${trip.agents.length}`);
+
       const passengersToSave = trip.agents.map((agent) => ({
         platform_id: platformId,
         trip_id: savedTrip.id,
