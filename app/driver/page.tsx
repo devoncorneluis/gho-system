@@ -356,7 +356,7 @@ export default function DriverPage() {
 
                     <div className="grid grid-cols-2 gap-3 mt-5 text-sm text-gray-700">
                       <p>📅 {trip.trip_date || "No date"}</p>
-                      <p>👥 {trip.passenger_count || tripPassengers.length} passengers</p>
+                      <p>👥 {trip.passenger_count || tripPassengers.length} Passengers Assigned</p>
                       <p>📏 {trip.estimated_km ? `${trip.estimated_km} km` : "KM not set"}</p>
                       <p>🚐 {trip.vehicle_name || "Vehicle not assigned"}</p>
                       <p className="col-span-2">🔢 {trip.vehicle_registration || "No registration"}</p>
