@@ -338,33 +338,37 @@ export default function DriverPage() {
                 const firstPassenger = tripPassengers[0];
 
                 return (
-                  <div key={trip.id} className="border-b pb-5 last:border-b-0">
-                    <p className="text-lg font-bold text-gray-700">
-                      {trip.trip_code}
-                    </p>
+                  <div key={trip.id} className="bg-white border rounded-3xl p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xl font-black text-[#061B33]">
+                          {trip.trip_code}
+                        </p>
+                        <p className="text-gray-500 mt-1">
+                          {trip.area || "Route not set"}
+                        </p>
+                      </div>
 
-                    <p className="text-gray-500 mt-1">
-                      {trip.trip_date || "No date"}
-                    </p>
+                      <span className="bg-gray-100 rounded-full px-3 py-1 text-sm font-bold text-gray-500">
+                        {statusBadge(trip.status)}
+                      </span>
+                    </div>
 
-                    <span className="inline-block bg-gray-100 rounded-md px-3 py-1 text-gray-500 mt-3">
-                      {statusBadge(trip.status)}
-                    </span>
-
-                    <div className="grid grid-cols-2 gap-3 mt-4 text-sm text-gray-600">
+                    <div className="grid grid-cols-2 gap-3 mt-5 text-sm text-gray-700">
+                      <p>📅 {trip.trip_date || "No date"}</p>
                       <p>👥 {trip.passenger_count || tripPassengers.length} passengers</p>
                       <p>📏 {trip.estimated_km ? `${trip.estimated_km} km` : "KM not set"}</p>
                       <p>🚐 {trip.vehicle_name || "Vehicle not assigned"}</p>
-                      <p>🔢 {trip.vehicle_registration || "No registration"}</p>
+                      <p className="col-span-2">🔢 {trip.vehicle_registration || "No registration"}</p>
                     </div>
 
-                    <div className="flex gap-2 mt-4">
+                    <div className="grid grid-cols-2 gap-3 mt-5">
                       <button
                         onClick={() => {
                           setSelectedTripId(trip.id);
                           updateTripStatus(trip.id, "Accepted");
                         }}
-                        className="border rounded-lg px-3 py-2 font-bold"
+                        className="border rounded-xl px-3 py-3 font-bold"
                       >
                         Open trip
                       </button>
@@ -373,7 +377,7 @@ export default function DriverPage() {
                         onClick={() =>
                           openGoogleMaps(firstPassenger?.pickup_address || trip.area)
                         }
-                        className="border rounded-lg px-3 py-2 font-bold"
+                        className="bg-[#061B33] text-white rounded-xl px-3 py-3 font-bold"
                       >
                         Google Maps
                       </button>
