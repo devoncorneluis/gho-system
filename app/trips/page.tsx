@@ -7,6 +7,17 @@ import { getUserPlatform } from "../../lib/getUserPlatform";
 
 
 
+type TripPassenger = {
+  id: string;
+  trip_id: string;
+  full_name: string | null;
+  phone: string | null;
+  pickup_area: string | null;
+  pickup_address: string | null;
+  pickup_time: string | null;
+  pickup_status: string | null;
+};
+
 type Trip = {
   id: string;
   platform_id: string;
@@ -28,6 +39,7 @@ type Trip = {
 
 export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [passengers, setPassengers] = useState<TripPassenger[]>([]);
   const [search, setSearch] = useState("");
   const [platformId, setPlatformId] = useState<string | null>(null);
 
@@ -46,6 +58,18 @@ export default function TripsPage() {
     }
 
     setTrips(data || []);
+
+    const { data: passengerData, error: passengerError } = await supabase
+      .from("trip_passengers")
+      .select("id, trip_id, full_name, phone, pickup_area, pickup_address, pickup_time, pickup_status")
+      .eq("platform_id", platformId);
+
+    if (passengerError) {
+      alert(passengerError.message);
+      return;
+    }
+
+    setPassengers(passengerData || []);
   }
 
   async function updateTrip(trip: Trip, status?: string) {
@@ -359,6 +383,33 @@ export default function TripsPage() {
                   <p>👤 Driver: {trip.driver_name || "Not assigned"}</p>
                   <p>🚐 Vehicle: {trip.vehicle_name || trip.vehicle_type || "Not assigned"}</p>
                   <p>🔢 Registration: {trip.vehicle_registration || "Not assigned"}</p>
+                </div>
+
+                <div className="mt-4 bg-white rounded-xl border p-4">
+                  <p className="font-bold text-[#061B33] mb-3">📄 Passenger Manifest</p>
+
+                  {passengers.filter((passenger) => passenger.trip_id === trip.id).length === 0 ? (
+                    <p className="text-gray-500">No passengers linked to this trip.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {passengers
+                        .filter((passenger) => passenger.trip_id === trip.id)
+                        .map((passenger, index) => (
+                          <div key={passenger.id} className="border rounded-lg p-3 bg-gray-50">
+                            <p className="font-bold">
+                              {index + 1}. {passenger.full_name || "Unknown Passenger"}
+                            </p>
+                            <p className="text-sm text-gray-600">📞 {passenger.phone || "No phone"}</p>
+                            <p className="text-sm text-gray-600">
+                              📍 {passenger.pickup_address || passenger.pickup_area || "No pickup address"}
+                            </p>
+                            <p className="text-sm font-bold">
+                              Status: {passenger.pickup_status || "Waiting"}
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
