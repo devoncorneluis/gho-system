@@ -8,6 +8,7 @@ type Trip = {
   id: string;
   trip_code: string;
   trip_date: string | null;
+  shift?: string | null;
   area: string | null;
   pickup_time: string | null;
   dropoff_time: string | null;
@@ -16,6 +17,7 @@ type Trip = {
   passenger_count: number | null;
   driver_name: string | null;
   status: string | null;
+  estimated_km?: number | null;
 };
 
 type Driver = {
@@ -46,7 +48,7 @@ export default function DriverPage() {
   const [driver, setDriver] = useState<Driver | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [passengers, setPassengers] = useState<TripPassenger[]>([]);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [tracking, setTracking] = useState(false);
   const [watchId, setWatchId] = useState<number | null>(null);
   const [locationMessage, setLocationMessage] = useState("");
@@ -245,6 +247,15 @@ export default function DriverPage() {
     );
   }
 
+  function statusBadge(status: string | null) {
+    const value = status || "assigned";
+    return value.toLowerCase();
+  }
+
+  function createSupportTicket() {
+    alert("Support ticket feature coming soon.");
+  }
+
   useEffect(() => {
     setupDriver();
   }, []);
@@ -255,106 +266,41 @@ export default function DriverPage() {
     (trip) => trip.status !== "Completed" && trip.status !== "Cancelled"
   );
 
-  const firstTrip = activeTrips[0];
-  const assignedVehicle =
-    firstTrip?.vehicle_name || driver?.assigned_vehicle || "No vehicle assigned";
+  const selectedTrip = activeTrips.find((trip) => trip.id === selectedTripId);
+  const selectedPassengers = selectedTrip
+    ? passengers.filter((passenger) => passenger.trip_id === selectedTrip.id)
+    : [];
 
   return (
     <main className="min-h-screen bg-[#F6F7FB] text-gray-700">
-      {menuOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="w-4/5 max-w-sm bg-white h-full p-8 shadow-2xl">
-            <div className="flex items-center justify-between mb-10">
-              <div>
-                <h1 className="text-3xl font-black text-[#061B33]">
-                  GHO Driver
-                </h1>
-                <p className="text-orange-500 font-bold">
-                  Driving Excellence
-                </p>
-              </div>
-
-              <button
-                onClick={() => setMenuOpen(false)}
-                className="text-3xl text-gray-400"
-              >
-                ×
-              </button>
-            </div>
-
-            <nav className="space-y-8 text-xl font-semibold text-gray-500">
-              <p>📊 Dashboard</p>
-              <p>📅 Bookings</p>
-              <p>🧾 Trip History</p>
-              <p>👤 Profile</p>
-            </nav>
-
-            <button
-              onClick={logout}
-              className="absolute bottom-8 left-8 right-8 bg-black text-white rounded-2xl py-4 font-bold"
-            >
-              Sign Out
-            </button>
-          </div>
-
-          <button
-            onClick={() => setMenuOpen(false)}
-            className="flex-1 bg-black/40"
-          />
-        </div>
-      )}
-
-      <header className="bg-white border-b p-5 sticky top-0 z-40">
+      <header className="bg-white border-b sticky top-0 z-40 p-4">
         <div className="flex items-center justify-between">
-          <button
-            onClick={() => setMenuOpen(true)}
-            className="text-3xl text-gray-500"
-          >
-            ☰
-          </button>
-
-          <div className="text-right">
-            <h1 className="text-xl font-black text-[#061B33]">
-              Driver Dashboard
-            </h1>
-            <p className="text-sm">
-              Logged in as <strong>{driverName}</strong>
-            </p>
+          <div>
+            <h1 className="text-xl font-black text-[#061B33]">GHO Driver</h1>
+            <p className="text-sm text-gray-500">{driverName}</p>
           </div>
+
+          <button
+            onClick={logout}
+            className="border rounded-xl px-4 py-2 font-bold text-gray-600"
+          >
+            Logout
+          </button>
         </div>
       </header>
 
-      <section className="p-4 space-y-5">
-        <div className="bg-white rounded-3xl shadow p-6 overflow-hidden">
-          <h2 className="text-3xl font-black text-gray-700">
-            Hi {driverName.split(" ")[0]}, welcome back.
+      <section className="p-4 space-y-5 max-w-2xl mx-auto">
+        <div className="bg-white rounded-3xl shadow p-5">
+          <p className="text-sm text-gray-400 font-bold">Driver Status</p>
+          <h2 className="text-2xl font-black text-[#061B33]">
+            {driver?.availability_status || "Available"}
           </h2>
-          <p className="text-xl text-gray-500 mt-2">
-            Here are your trips for today.
-          </p>
 
-          <div className="bg-gray-100 rounded-xl p-5 mt-6">
-            <p className="text-gray-500">Assigned vehicle:</p>
-            <p className="text-xl font-bold mt-1">
-              {assignedVehicle}
-              {firstTrip?.vehicle_registration
-                ? `, ${firstTrip.vehicle_registration}`
-                : ""}
-            </p>
-          </div>
-
-          <div className="mt-6 bg-gray-50 rounded-2xl p-6 text-center">
-            <div className="text-7xl">🚘</div>
-            <p className="text-gray-500 mt-3">
-              Safe transport, live tracking, and trip updates.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 mt-6">
+          <div className="grid grid-cols-2 gap-3 mt-4">
             <button
               onClick={startGpsTracking}
               disabled={tracking}
-              className="bg-green-600 text-white p-4 rounded-2xl font-bold disabled:bg-gray-300"
+              className="bg-green-600 text-white p-3 rounded-2xl font-bold disabled:bg-gray-300"
             >
               Start GPS
             </button>
@@ -362,161 +308,226 @@ export default function DriverPage() {
             <button
               onClick={stopGpsTracking}
               disabled={!tracking}
-              className="bg-red-600 text-white p-4 rounded-2xl font-bold disabled:bg-gray-300"
+              className="bg-red-600 text-white p-3 rounded-2xl font-bold disabled:bg-gray-300"
             >
               Stop GPS
             </button>
           </div>
 
           {locationMessage && (
-            <p className="bg-green-50 text-green-700 border border-green-200 rounded-2xl p-4 mt-5 font-bold">
+            <p className="bg-green-50 text-green-700 border border-green-200 rounded-2xl p-3 mt-4 font-bold">
               ✅ {locationMessage}
             </p>
           )}
         </div>
 
-        <div className="bg-white rounded-3xl shadow p-6">
-          <h2 className="text-2xl font-black mb-4">Today&apos;s Trips</h2>
+        {!selectedTrip && (
+          <div className="bg-white rounded-3xl shadow p-5">
+            <h2 className="text-2xl font-black mb-4">Assigned Trips</h2>
 
-          {activeTrips.length === 0 && (
-            <p className="text-gray-500">No trips assigned yet.</p>
-          )}
+            {activeTrips.length === 0 && (
+              <p className="text-gray-500">No trips assigned yet.</p>
+            )}
 
-          <div className="space-y-5">
-            {activeTrips.map((trip) => {
-              const tripPassengers = passengers.filter(
-                (passenger) => passenger.trip_id === trip.id
-              );
+            <div className="space-y-4">
+              {activeTrips.map((trip) => {
+                const tripPassengers = passengers.filter(
+                  (passenger) => passenger.trip_id === trip.id
+                );
 
-              const firstPassenger = tripPassengers[0];
+                const firstPassenger = tripPassengers[0];
 
-              return (
-                <div key={trip.id} className="border rounded-3xl p-5 bg-gray-50">
-                  <p className="text-lg font-black text-[#061B33]">
-                    {trip.trip_code}
-                  </p>
+                return (
+                  <div key={trip.id} className="border-b pb-5 last:border-b-0">
+                    <p className="text-lg font-bold text-gray-700">
+                      {trip.trip_code}
+                    </p>
 
-                  <div className="grid grid-cols-2 gap-4 mt-4 text-gray-600">
-                    <div>
-                      <p className="font-bold">{trip.trip_date || "No date"}</p>
-                      <p className="text-sm">Date</p>
-                    </div>
+                    <p className="text-gray-500 mt-1">
+                      {trip.trip_date || "No date"}
+                    </p>
 
-                    <div>
-                      <p className="font-bold">
-                        {trip.pickup_time || "No time"}
-                      </p>
-                      <p className="text-sm">Pickup Time</p>
-                    </div>
+                    <span className="inline-block bg-gray-100 rounded-md px-3 py-1 text-gray-500 mt-3">
+                      {statusBadge(trip.status)}
+                    </span>
 
-                    <div>
-                      <p className="font-bold">{trip.area || "No area"}</p>
-                      <p className="text-sm">Area</p>
-                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={() => {
+                          setSelectedTripId(trip.id);
+                          updateTripStatus(trip.id, "Accepted");
+                        }}
+                        className="border rounded-lg px-3 py-2 font-bold"
+                      >
+                        Open trip
+                      </button>
 
-                    <div>
-                      <p className="font-bold">
-                        {trip.status || "Assigned"}
-                      </p>
-                      <p className="text-sm">Status</p>
+                      <button
+                        onClick={() =>
+                          openGoogleMaps(firstPassenger?.pickup_address || trip.area)
+                        }
+                        className="border rounded-lg px-3 py-2 font-bold"
+                      >
+                        Google Maps
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex flex-wrap gap-2 mt-5">
-                    <button
-                      onClick={() => updateTripStatus(trip.id, "In Progress")}
-                      className="border border-green-500 text-green-600 px-4 py-2 rounded-lg font-bold"
-                    >
-                      Open Trip
-                    </button>
-
-                    <button
-                      onClick={() => openGoogleMaps(firstPassenger?.pickup_address || trip.area)}
-                      className="border px-4 py-2 rounded-lg font-bold"
-                    >
-                      Google Maps
-                    </button>
-
-                    <button
-                      onClick={() => updateTripStatus(trip.id, "Completed")}
-                      className="bg-[#061B33] text-white px-4 py-2 rounded-lg font-bold"
-                    >
-                      Complete
-                    </button>
-                  </div>
-
-                  <div className="bg-white rounded-2xl shadow-sm p-4 mt-5">
-                    <h3 className="text-xl font-black text-gray-600">
-                      Passenger Details
-                    </h3>
-
-                    {tripPassengers.length === 0 ? (
-                      <p className="text-gray-500 mt-3">
-                        No passengers linked to this trip yet.
-                      </p>
-                    ) : (
-                      <div className="space-y-4 mt-4">
-                        {tripPassengers.map((passenger) => (
-                          <div
-                            key={passenger.id}
-                            className="border-b pb-4 last:border-b-0"
-                          >
-                            <p>
-                              👤 <strong>Passenger:</strong>{" "}
-                              {passenger.full_name || "Unknown"}{" "}
-                              {passenger.phone ? `- ${passenger.phone}` : ""}
-                            </p>
-
-                            <p>
-                              🕒 <strong>Pickup time:</strong>{" "}
-                              {passenger.pickup_time || trip.pickup_time || "Not set"}
-                            </p>
-
-                            <p>
-                              📍{" "}
-                              {passenger.pickup_address ||
-                                passenger.pickup_area ||
-                                "No pickup address"}
-                            </p>
-
-                            <div className="flex flex-wrap gap-2 mt-3">
-                              <button
-                                onClick={() =>
-                                  updatePassengerStatus(passenger.id, "Picked Up")
-                                }
-                                className="bg-green-600 text-white px-3 py-2 rounded-lg font-bold"
-                              >
-                                Picked Up
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  updatePassengerStatus(passenger.id, "Running Late")
-                                }
-                                className="bg-orange-500 text-white px-3 py-2 rounded-lg font-bold"
-                              >
-                                Late
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  updatePassengerStatus(passenger.id, "No Show")
-                                }
-                                className="bg-red-600 text-white px-3 py-2 rounded-lg font-bold"
-                              >
-                                No Show
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
+
+        {selectedTrip && (
+          <>
+            <button
+              onClick={() => setSelectedTripId(null)}
+              className="border rounded-xl px-4 py-2 font-bold bg-white"
+            >
+              ← Back to trips
+            </button>
+
+            <div className="bg-white rounded-3xl shadow p-6">
+              <h2 className="text-2xl font-black text-center text-gray-400">
+                Trip Details
+              </h2>
+
+              <div className="border-t mt-6 pt-6">
+                <p className="text-xl font-bold">{selectedTrip.trip_code}</p>
+                <p className="text-gray-400">Trip ID</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 border-t mt-6 pt-6">
+                <div>
+                  <p className="text-xl font-bold">
+                    {selectedTrip.trip_date || "No date"}
+                  </p>
+                  <p className="text-gray-400">Date</p>
+                </div>
+
+                <div>
+                  <p className="text-xl font-bold">
+                    {selectedTrip.shift || selectedTrip.pickup_time || "No time"}
+                  </p>
+                  <p className="text-gray-400">Timeslot</p>
+                </div>
+              </div>
+
+              <div className="border-t mt-6 pt-6">
+                <p className="text-xl font-bold">Corneluis Group Pty Ltd</p>
+                <p className="text-gray-400">Company</p>
+              </div>
+
+              <div className="border-t mt-6 pt-6">
+                <p className="text-xl font-bold">
+                  {selectedTrip.vehicle_name ||
+                    driver?.assigned_vehicle ||
+                    "No vehicle assigned"}
+                </p>
+                <p className="text-gray-400">
+                  {selectedTrip.vehicle_registration || "Fleet"}
+                </p>
+              </div>
+
+              <div className="border-t mt-6 pt-6">
+                <p className="text-xl font-bold">
+                  {selectedTrip.area || "No route"}
+                </p>
+                <p className="text-gray-400">Route</p>
+              </div>
+
+              <div className="border-t mt-6 pt-6">
+                <p className="text-xl font-bold">
+                  {selectedTrip.estimated_km ? `${selectedTrip.estimated_km} km` : "KM not set"}
+                </p>
+                <p className="text-gray-400">Distance</p>
+              </div>
+
+              <button
+                onClick={createSupportTicket}
+                className="border border-green-500 text-green-600 rounded-lg px-4 py-2 font-bold mt-6"
+              >
+                Create Support Ticket
+              </button>
+            </div>
+
+            <div className="bg-white rounded-3xl shadow p-6">
+              <h2 className="text-2xl font-black text-gray-400 mb-6">
+                Passenger Details
+              </h2>
+
+              {selectedPassengers.length === 0 && (
+                <p className="text-gray-500">No passengers linked to this trip yet.</p>
+              )}
+
+              <div className="space-y-5">
+                {selectedPassengers.map((passenger) => (
+                  <div key={passenger.id} className="border-b pb-5 last:border-b-0">
+                    <p>
+                      👤 <strong>Passenger:</strong>{" "}
+                      {passenger.full_name || "Unknown"}{" "}
+                      {passenger.phone ? `- ${passenger.phone}` : ""}
+                    </p>
+
+                    <p className="mt-2">
+                      🕒 <strong>Pick up time:</strong>{" "}
+                      {passenger.pickup_time ||
+                        selectedTrip.pickup_time ||
+                        "Not set"}
+                    </p>
+
+                    <p className="mt-2 text-gray-600">
+                      📍{" "}
+                      {passenger.pickup_address ||
+                        passenger.pickup_area ||
+                        "No pickup address"}
+                    </p>
+
+                    <p className="mt-2 text-gray-600">
+                      🟠 {selectedTrip.area || "Destination not set"}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      <button
+                        onClick={() =>
+                          updatePassengerStatus(passenger.id, "Picked Up")
+                        }
+                        className="bg-green-600 text-white px-3 py-2 rounded-lg font-bold"
+                      >
+                        Picked Up
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          updatePassengerStatus(passenger.id, "Running Late")
+                        }
+                        className="bg-orange-500 text-white px-3 py-2 rounded-lg font-bold"
+                      >
+                        Late
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          updatePassengerStatus(passenger.id, "No Show")
+                        }
+                        className="bg-red-600 text-white px-3 py-2 rounded-lg font-bold"
+                      >
+                        No Show
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => updateTripStatus(selectedTrip.id, "Completed")}
+                className="bg-[#061B33] text-white rounded-2xl p-4 font-bold w-full mt-6"
+              >
+                Complete Trip
+              </button>
+            </div>
+          </>
+        )}
       </section>
     </main>
   );
