@@ -349,6 +349,21 @@ export default function DailyTransportPlannerPage() {
                       )}
                     </select>
 
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={estimatedKm[area] || ""}
+                      onChange={(e) =>
+                        setEstimatedKm((current) => ({
+                          ...current,
+                          [area]: e.target.value,
+                        }))
+                      }
+                      placeholder="Estimated KM"
+                      className="border p-3 rounded-lg"
+                    />
+
                     <div className="flex gap-2">
                       <input
                         value={extraAgentNames[area] || ""}
