@@ -11,8 +11,14 @@ type Trip = {
   status: string | null;
 };
 
+type Passenger = {
+  id: string;
+  pickup_status: string | null;
+};
+
 export default function ReportsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [passengers, setPassengers] = useState<Passenger[]>([]);
 
   async function loadTrips() {
     const { data, error } = await supabase
@@ -26,6 +32,18 @@ export default function ReportsPage() {
     }
 
     setTrips(data || []);
+
+    const { data: passengerData, error: passengerError } = await supabase
+      .from("trip_passengers")
+      .select("id, pickup_status")
+      .eq("platform_id", PLATFORM_ID);
+
+    if (passengerError) {
+      alert(passengerError.message);
+      return;
+    }
+
+    setPassengers(passengerData || []);
   }
 
   useEffect(() => {
@@ -36,6 +54,11 @@ export default function ReportsPage() {
   const assignedTrips = trips.filter((trip) => trip.status === "Assigned").length;
   const completedTrips = trips.filter((trip) => trip.status === "Completed").length;
   const suggestedTrips = trips.filter((trip) => trip.status === "Suggested").length;
+
+  const waitingPassengers = passengers.filter((p) => !p.pickup_status || p.pickup_status === "Waiting").length;
+  const pickedUpPassengers = passengers.filter((p) => p.pickup_status === "Picked Up").length;
+  const latePassengers = passengers.filter((p) => p.pickup_status === "Running Late").length;
+  const noShowPassengers = passengers.filter((p) => p.pickup_status === "No Show").length;
 
   return (
     <AdminLayout>
@@ -65,6 +88,28 @@ export default function ReportsPage() {
         <div className="bg-white rounded-xl shadow p-6">
           <p className="font-bold">Suggested Trips</p>
           <p className="text-4xl text-orange-500 font-bold">{suggestedTrips}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+        <div className="bg-white rounded-xl shadow p-6">
+          <p className="font-bold">🟡 Waiting</p>
+          <p className="text-4xl text-yellow-600 font-bold">{waitingPassengers}</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6">
+          <p className="font-bold">🟢 Picked Up</p>
+          <p className="text-4xl text-green-600 font-bold">{pickedUpPassengers}</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6">
+          <p className="font-bold">🟠 Running Late</p>
+          <p className="text-4xl text-orange-500 font-bold">{latePassengers}</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-6">
+          <p className="font-bold">🔴 No Show</p>
+          <p className="text-4xl text-red-600 font-bold">{noShowPassengers}</p>
         </div>
       </div>
 
