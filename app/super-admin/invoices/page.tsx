@@ -9,6 +9,7 @@ type Invoice = {
   invoice_number: string | null;
   company_name: string | null;
   completed_trips: number | null;
+  total_km: number | null;
   contract_type: string | null;
   contract_rate: number | null;
   total_amount: number | null;
@@ -77,7 +78,7 @@ export default function SuperAdminInvoicesPage() {
 
     const { data: completedTrips, error: tripError } = await supabase
       .from("trips")
-      .select("id")
+      .select("id, estimated_km")
       .eq("platform_id", selectedPlatformId)
       .eq("status", "Completed");
 
@@ -87,6 +88,7 @@ export default function SuperAdminInvoicesPage() {
     }
 
     const tripCount = completedTrips?.length || 0;
+    const totalKm = (completedTrips || []).reduce((sum, trip) => sum + Number(trip.estimated_km || 0), 0);
     const contractType = platform.contract_type || "Per Trip";
     const contractRate = Number(platform.contract_rate || 0);
     const totalAmount =
@@ -104,6 +106,7 @@ export default function SuperAdminInvoicesPage() {
       billing_period_end: new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10),
       company_name: platform.company_name || platform.name,
       completed_trips: tripCount,
+      total_km: totalKm,
       contract_type: contractType,
       contract_rate: contractRate,
       subtotal: totalAmount,
@@ -174,6 +177,7 @@ export default function SuperAdminInvoicesPage() {
                     <th className="p-3">Invoice</th>
                     <th className="p-3">Company</th>
                     <th className="p-3">Trips</th>
+                    <th className="p-3">KM</th>
                     <th className="p-3">Contract</th>
                     <th className="p-3">Total</th>
                     <th className="p-3">Status</th>
@@ -189,6 +193,7 @@ export default function SuperAdminInvoicesPage() {
                       </td>
                       <td className="p-3">{invoice.company_name}</td>
                       <td className="p-3">{invoice.completed_trips || 0}</td>
+                      <td className="p-3">{invoice.total_km ? `${invoice.total_km} km` : "0 km"}</td>
                       <td className="p-3">
                         {invoice.contract_type || "Per Trip"} - R
                         {invoice.contract_rate || 0}
