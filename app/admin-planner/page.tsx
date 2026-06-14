@@ -49,6 +49,11 @@ export default function DailyTransportPlannerPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedDriverVehicle, setSelectedDriverVehicle] = useState<Record<string, string>>({});
+  const [approvedTrips, setApprovedTrips] = useState<Record<string, boolean>>({});
+  const [editingTrips, setEditingTrips] = useState<Record<string, boolean>>({});
+  const [editedTripNames, setEditedTripNames] = useState<Record<string, string>>({});
+  const [editedPickupTimes, setEditedPickupTimes] = useState<Record<string, string>>({});
+  const [extraAgentNames, setExtraAgentNames] = useState<Record<string, string>>({});
   const [planningMode, setPlanningMode] = useState("By Area");
   const [selectedRouteGroupId, setSelectedRouteGroupId] = useState("");
   const [planDate, setPlanDate] = useState(new Date().toISOString().slice(0, 10));
