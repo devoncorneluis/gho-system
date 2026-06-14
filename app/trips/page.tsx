@@ -171,6 +171,7 @@ export default function TripsPage() {
       vehicle_name: trip.vehicle_name,
       vehicle_registration: trip.vehicle_registration,
       passenger_count: trip.passenger_count,
+      estimated_km: trip.estimated_km,
       trip_status: "Completed",
       billing_status: "Unbilled",
       billing_amount: 0,

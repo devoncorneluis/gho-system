@@ -366,11 +366,11 @@ export default function DriverPage() {
                       <button
                         onClick={() => {
                           setSelectedTripId(trip.id);
-                          updateTripStatus(trip.id, "Accepted");
+                          updateTripStatus(trip.id, "In Progress");
                         }}
                         className="border rounded-xl px-3 py-3 font-bold"
                       >
-                        Open trip
+                        Start Trip
                       </button>
 
                       <button
