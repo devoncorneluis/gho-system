@@ -498,6 +498,10 @@ export default function DriverPage() {
                       🟠 {selectedTrip.area || "Destination not set"}
                     </p>
 
+                    <p className="mt-2 font-bold text-gray-700">
+                      Status: {passenger.pickup_status || "Waiting"}
+                    </p>
+
                     <div className="flex flex-wrap gap-2 mt-4">
                       <button
                         onClick={() =>
