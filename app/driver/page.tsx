@@ -499,7 +499,15 @@ export default function DriverPage() {
                     </p>
 
                     <p className="mt-2 font-bold text-gray-700">
-                      Status: {passenger.pickup_status || "Waiting"}
+                      {passenger.pickup_status === "Picked Up" ? (
+                        <span className="text-green-600 font-bold">🟢 Picked Up</span>
+                      ) : passenger.pickup_status === "Running Late" ? (
+                        <span className="text-orange-500 font-bold">🟠 Running Late</span>
+                      ) : passenger.pickup_status === "No Show" ? (
+                        <span className="text-red-600 font-bold">🔴 No Show</span>
+                      ) : (
+                        <span className="text-yellow-600 font-bold">🟡 Waiting</span>
+                      )}
                     </p>
 
                     <div className="flex flex-wrap gap-2 mt-4">
