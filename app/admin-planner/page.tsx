@@ -169,6 +169,57 @@ export default function DailyTransportPlannerPage() {
     }));
   }
 
+  function startEditTrip(tripKey: string) {
+    setEditingTrips((current) => ({ ...current, [tripKey]: true }));
+    setEditedTripNames((current) => ({ ...current, [tripKey]: current[tripKey] || tripKey }));
+    setEditedPickupTimes((current) => ({
+      ...current,
+      [tripKey]: current[tripKey] || (shift.includes("06:00") ? "05:00" : "17:00"),
+    }));
+  }
+
+  function saveEditTrip(tripKey: string) {
+    setEditingTrips((current) => ({ ...current, [tripKey]: false }));
+    alert("Trip changes saved");
+  }
+
+  function approvePlan(tripKey: string) {
+    if (!selectedDriverVehicle[tripKey]) {
+      alert("Select Driver & Vehicle before approving");
+      return;
+    }
+
+    setApprovedTrips((current) => ({ ...current, [tripKey]: true }));
+    alert("Plan approved");
+  }
+
+  function addMissingAgent(tripKey: string) {
+    const name = extraAgentNames[tripKey]?.trim();
+
+    if (!name) {
+      alert("Enter the missing agent name first");
+      return;
+    }
+
+    const newAgent: Agent = {
+      id: `manual-${Date.now()}`,
+      full_name: name,
+      email: null,
+      phone: null,
+      home_area: tripKey,
+      status: "Active",
+    };
+
+    setAgents((current) => [...current, newAgent]);
+
+    setExtraAgentNames((current) => ({
+      ...current,
+      [tripKey]: "",
+    }));
+
+    alert(`${name} added to ${tripKey}`);
+  }
+
   return (
     <AdminLayout>
       <main className="min-h-screen bg-gray-100 p-6">
