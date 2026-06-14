@@ -23,6 +23,7 @@ type Trip = {
   created_at: string | null;
   vehicle_name: string | null;
   vehicle_registration: string | null;
+  estimated_km: number | null;
 };
 
 export default function TripsPage() {
@@ -270,6 +271,7 @@ export default function TripsPage() {
                     <p><strong>Pickup:</strong> {trip.pickup_time}</p>
                     <p><strong>Drop-off:</strong> {trip.dropoff_time}</p>
                     <p><strong>Passengers:</strong> {trip.passenger_count}</p>
+                    <p><strong>Estimated KM:</strong> {trip.estimated_km ? `${trip.estimated_km} km` : "Not set"}</p>
                     <p><strong>Status:</strong> {trip.status}</p>
                   </div>
 
