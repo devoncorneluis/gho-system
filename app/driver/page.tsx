@@ -15,6 +15,7 @@ type Trip = {
   vehicle_name: string | null;
   vehicle_registration: string | null;
   passenger_count: number | null;
+  estimated_km: number | null;
   driver_name: string | null;
   status: string | null;
   estimated_km?: number | null;
