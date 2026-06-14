@@ -221,6 +221,78 @@ export default function DailyTransportPlannerPage() {
     alert(`${name} added to ${tripKey}`);
   }
 
+  async function saveConfirmedTrip(
+    tripCode: string,
+    area: string,
+    areaAgents: Agent[]
+  ) {
+    if (!platformId) {
+      alert("Platform not loaded");
+      return;
+    }
+
+    if (!approvedTrips[area]) {
+      alert("Approve this plan before saving the trip");
+      return;
+    }
+
+    const routeName = editedTripNames[area] || area;
+    const pickupTime =
+      editedPickupTimes[area] || (shift.includes("06:00") ? "05:00" : "17:00");
+    const dropoffTime = shift.includes("06:00") ? "06:00" : "18:00";
+    const kmValue = estimatedKm[area] ? Number(estimatedKm[area]) : null;
+
+    const { data: savedTrip, error: tripError } = await supabase
+      .from("trips")
+      .insert({
+        platform_id: platformId,
+        trip_code: tripCode,
+        trip_date: planDate,
+        shift,
+        area: routeName,
+        pickup_time: pickupTime,
+        dropoff_time: dropoffTime,
+        vehicle_type: suggestedVehicle(areaAgents.length),
+        passenger_count: areaAgents.length,
+        driver_name: "Not assigned",
+        estimated_km: kmValue,
+        status: "Confirmed",
+      })
+      .select("id")
+      .single();
+
+    if (tripError || !savedTrip) {
+      alert(tripError?.message || "Trip could not be saved");
+      return;
+    }
+
+    const passengersToSave = areaAgents.map((agent) => ({
+      platform_id: platformId,
+      trip_id: savedTrip.id,
+      full_name: agent.full_name,
+      email: agent.email,
+      phone: agent.phone,
+      pickup_area: agent.home_area || routeName,
+      pickup_address: agent.home_area || routeName,
+      pickup_time: pickupTime,
+      dropoff_time: dropoffTime,
+      pickup_status: "Waiting",
+    }));
+
+    if (passengersToSave.length > 0) {
+      const { error: passengerError } = await supabase
+        .from("trip_passengers")
+        .insert(passengersToSave);
+
+      if (passengerError) {
+        alert(passengerError.message);
+        return;
+      }
+    }
+
+    alert(`${tripCode} saved as Confirmed. Manage driver and vehicle from Trips page.`);
+  }
+
   return (
     <AdminLayout>
       <main className="min-h-screen bg-gray-100 p-6">
