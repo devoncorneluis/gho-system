@@ -351,6 +351,20 @@ export default function DriverPage() {
                       {statusBadge(trip.status)}
                     </span>
 
+                    <div className="grid grid-cols-2 gap-3 mt-4 text-sm text-gray-600">
+                      <p>👥 {trip.passenger_count || tripPassengers.length} passengers</p>
+                      <p>📏 {trip.estimated_km ? `${trip.estimated_km} km` : "KM not set"}</p>
+                      <p>🚐 {trip.vehicle_name || "Vehicle not assigned"}</p>
+                      <p>🔢 {trip.vehicle_registration || "No registration"}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-4 text-sm text-gray-600">
+                      <p>👥 {trip.passenger_count || tripPassengers.length} passengers</p>
+                      <p>📏 {trip.estimated_km ? `${trip.estimated_km} km` : "KM not set"}</p>
+                      <p>🚐 {trip.vehicle_name || "Vehicle not assigned"}</p>
+                      <p>🔢 {trip.vehicle_registration || "No registration"}</p>
+                    </div>
+
                     <div className="flex gap-2 mt-4">
                       <button
                         onClick={() => {
