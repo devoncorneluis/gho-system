@@ -326,7 +326,7 @@ export default function DriverPage() {
             <h2 className="text-2xl font-black mb-4">Assigned Trips</h2>
 
             {activeTrips.length === 0 && (
-              <p className="text-gray-500">No trips assigned yet.</p>
+              <p className="text-gray-500">No assigned trips yet.</p>
             )}
 
             <div className="space-y-4">
