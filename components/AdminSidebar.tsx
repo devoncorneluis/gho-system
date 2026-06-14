@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabase";
 
 const links = [
   { name: "🏠 Dashboard", href: "/admin" },
-  { name: "📅 Calendar", href: "/calendar" },
+  { name: "🚐 Daily Planner", href: "/admin-planner" },
   { name: "🚐 Trips", href: "/trips" },
   { name: "👥 Agents", href: "/agents" },
   { name: "🚗 Drivers", href: "/drivers" },

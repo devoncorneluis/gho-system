@@ -14,7 +14,7 @@ type EmergencyAlert = { id: string; status: string | null };
 type Vehicle = { id: string; status: string | null };
 
 const menuItems = [
-  { name: "Calendar", icon: "📅", href: "/calendar" },
+{ name: "Daily Planner", icon: "🚐", href: "/admin-planner" },
   { name: "Trips", icon: "🚐", href: "/trips" },
   { name: "Route Playback", icon: "🛰️", href: "/route-playback" },
   { name: "Agents", icon: "👥", href: "/agents" },

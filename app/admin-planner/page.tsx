@@ -11,8 +11,7 @@ type Agent = {
   email: string | null;
   phone: string | null;
   home_area: string | null;
-  pickup_address?: string | null;
-  status: string | null;
+    status: string | null;
 };
 
 type RouteGroup = {
@@ -22,7 +21,19 @@ type RouteGroup = {
   status: string | null;
 };
 
-type DriverVehicle = {
+type Driver = {
+  id: string;
+  full_name: string;
+};
+
+type Vehicle = {
+  id: string;
+  vehicle_name: string;
+  vehicle_type: string | null;
+  registration_number: string;
+};
+
+type DriverVehicleSelection = {
   driver_id: string;
   driver_name: string;
   vehicle_id: string;
@@ -35,7 +46,8 @@ export default function DailyTransportPlannerPage() {
   const [platformId, setPlatformId] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [routeGroups, setRouteGroups] = useState<RouteGroup[]>([]);
-  const [driverVehicles, setDriverVehicles] = useState<DriverVehicle[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedDriverVehicle, setSelectedDriverVehicle] = useState<Record<string, string>>({});
   const [planningMode, setPlanningMode] = useState("By Area");
   const [selectedRouteGroupId, setSelectedRouteGroupId] = useState("");
@@ -61,7 +73,7 @@ export default function DailyTransportPlannerPage() {
   async function loadAgents(activePlatformId: string) {
     const { data, error } = await supabase
       .from("agents")
-      .select("id, full_name, email, phone, home_area, pickup_address, status")
+      .select("id, full_name, email, phone, home_area, status")
       .eq("platform_id", activePlatformId)
       .eq("status", "Active")
       .order("home_area");
@@ -74,42 +86,33 @@ export default function DailyTransportPlannerPage() {
     setAgents(data || []);
   }
 
-  async function loadDriverVehicles(activePlatformId: string) {
-    const { data, error } = await supabase
+  async function loadDriversAndVehicles(activePlatformId: string) {
+    const { data: driverData, error: driverError } = await supabase
+      .from("drivers")
+      .select("id, full_name")
+      .eq("platform_id", activePlatformId)
+      .eq("status", "Active")
+      .order("full_name");
+
+    if (driverError) {
+      alert(driverError.message);
+      return;
+    }
+
+    const { data: vehicleData, error: vehicleError } = await supabase
       .from("vehicles")
-      .select(`
-        id,
-        vehicle_name,
-        vehicle_type,
-        registration_number,
-        driver_id,
-        drivers (
-          id,
-          full_name
-        )
-      `)
+      .select("id, vehicle_name, vehicle_type, registration_number")
       .eq("platform_id", activePlatformId)
       .eq("status", "Available")
       .order("vehicle_name");
 
-    if (error) {
-      alert(error.message);
+    if (vehicleError) {
+      alert(vehicleError.message);
       return;
     }
 
-    const mappedVehicles =
-      (data || [])
-        .filter((vehicle: any) => vehicle.driver_id && vehicle.drivers)
-        .map((vehicle: any) => ({
-          driver_id: vehicle.drivers.id,
-          driver_name: vehicle.drivers.full_name,
-          vehicle_id: vehicle.id,
-          vehicle_name: vehicle.vehicle_name,
-          vehicle_type: vehicle.vehicle_type,
-          registration_number: vehicle.registration_number,
-        }));
-
-    setDriverVehicles(mappedVehicles);
+    setDrivers(driverData || []);
+    setVehicles(vehicleData || []);
   }
 
   useEffect(() => {
@@ -124,7 +127,7 @@ export default function DailyTransportPlannerPage() {
       setPlatformId(userPlatform.platformId);
       loadAgents(userPlatform.platformId);
       loadRouteGroups(userPlatform.platformId);
-      loadDriverVehicles(userPlatform.platformId);
+      loadDriversAndVehicles(userPlatform.platformId);
     }
 
     setupPage();
@@ -220,7 +223,7 @@ export default function DailyTransportPlannerPage() {
               onClick={() => {
                 if (!platformId) return;
                 loadAgents(platformId);
-                loadDriverVehicles(platformId);
+                loadDriversAndVehicles(platformId);
               }}
               className="bg-orange-500 text-white rounded-lg px-5 py-3 font-bold"
             >
@@ -277,14 +280,16 @@ export default function DailyTransportPlannerPage() {
                       className="border p-3 rounded-lg"
                     >
                       <option value="">Select Driver & Vehicle</option>
-                      {driverVehicles.map((item) => (
-                        <option
-                          key={`${item.driver_id}-${item.vehicle_id}`}
-                          value={`${item.driver_id}|${item.vehicle_id}`}
-                        >
-                          {item.driver_name} | {item.vehicle_name} | {item.registration_number}
-                        </option>
-                      ))}
+                      {drivers.flatMap((driver) =>
+                        vehicles.map((vehicle) => (
+                          <option
+                            key={`${driver.id}-${vehicle.id}`}
+                            value={`${driver.id}|${vehicle.id}|${driver.full_name}|${vehicle.vehicle_name}|${vehicle.registration_number}|${vehicle.vehicle_type || ""}`}
+                          >
+                            {driver.full_name} | {vehicle.vehicle_name} | {vehicle.registration_number}
+                          </option>
+                        ))
+                      )}
                     </select>
 
                     <button className="bg-[#061B33] text-white rounded-lg px-5 py-3 font-bold">
@@ -313,7 +318,7 @@ export default function DailyTransportPlannerPage() {
                           {passengerIndex + 1}. {agent.full_name}
                         </p>
                         <p className="text-sm text-gray-500">
-                          📍 {agent.pickup_address || agent.home_area || "No pickup address"}
+                          📍 {agent.home_area || "No pickup address"}
                         </p>
                         <p className="text-sm text-gray-500">
                           📞 {agent.phone || "No phone"} • {agent.email || "No email"}
