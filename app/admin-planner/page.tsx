@@ -348,7 +348,49 @@ export default function DailyTransportPlannerPage() {
                       )}
                     </select>
 
-                    <button className="bg-[#061B33] text-white rounded-lg px-5 py-3 font-bold">
+                    <div className="flex gap-2">
+                      <input
+                        value={extraAgentNames[area] || ""}
+                        onChange={(e) =>
+                          setExtraAgentNames((current) => ({
+                            ...current,
+                            [area]: e.target.value,
+                          }))
+                        }
+                        placeholder="Missing agent name"
+                        className="border p-3 rounded-lg flex-1"
+                      />
+
+                      <button
+                        onClick={() => addMissingAgent(area)}
+                        className="bg-purple-600 text-white rounded-lg px-4 py-3 font-bold"
+                      >
+                        ➕ Add
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => startEditTrip(area)}
+                      className="bg-blue-600 text-white rounded-lg px-5 py-3 font-bold"
+                    >
+                      ✏️ Edit Trip
+                    </button>
+
+                    <button
+                      onClick={() => approvePlan(area)}
+                      className="bg-green-600 text-white rounded-lg px-5 py-3 font-bold"
+                    >
+                      ✅ Approve Plan
+                    </button>
+
+                    <button
+                      disabled={!approvedTrips[area]}
+                      className={`rounded-lg px-5 py-3 font-bold ${
+                        approvedTrips[area]
+                          ? "bg-[#061B33] text-white"
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
+                    >
                       🚀 Dispatch Trip
                     </button>
 
