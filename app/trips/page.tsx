@@ -225,7 +225,7 @@ export default function TripsPage() {
   }, [platformId]);
 
   const filteredTrips = trips.filter((trip) => {
-    const text = `${trip.trip_code} ${trip.area} ${trip.driver_name} ${trip.vehicle_name} ${trip.vehicle_registration} ${trip.status}`.toLowerCase();
+    const text = `${trip.trip_code} ${trip.trip_date} ${trip.shift} ${trip.area} ${trip.driver_name} ${trip.vehicle_name} ${trip.vehicle_registration} ${trip.status}`.toLowerCase();
     return text.includes(search.toLowerCase());
   });
 
