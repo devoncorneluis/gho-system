@@ -18,6 +18,19 @@ type TripPassenger = {
   pickup_status: string | null;
 };
 
+type Driver = {
+  id: string;
+  full_name: string | null;
+};
+
+type Vehicle = {
+  id: string;
+  vehicle_name: string | null;
+  registration_number: string | null;
+  driver_id?: string | null;
+  assigned_driver?: string | null;
+};
+
 type Trip = {
   id: string;
   platform_id: string;
@@ -40,6 +53,8 @@ type Trip = {
 export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [passengers, setPassengers] = useState<TripPassenger[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [search, setSearch] = useState("");
   const [platformId, setPlatformId] = useState<string | null>(null);
 
