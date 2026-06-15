@@ -85,6 +85,19 @@ export default function TripsPage() {
     }
 
     setPassengers(passengerData || []);
+
+    const { data: driverData, error: driverError } = await supabase
+      .from("drivers")
+      .select("id, full_name")
+      .eq("platform_id", platformId)
+      .order("full_name", { ascending: true });
+
+    if (driverError) {
+      alert(driverError.message);
+      return;
+    }
+
+    setDrivers(driverData || []);
   }
 
   async function updateTrip(trip: Trip, status?: string) {
