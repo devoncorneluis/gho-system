@@ -98,6 +98,19 @@ export default function TripsPage() {
     }
 
     setDrivers(driverData || []);
+
+    const { data: vehicleData, error: vehicleError } = await supabase
+      .from("vehicles")
+      .select("id, vehicle_name, registration_number, driver_id, assigned_driver")
+      .eq("platform_id", platformId)
+      .order("vehicle_name", { ascending: true });
+
+    if (vehicleError) {
+      alert(vehicleError.message);
+      return;
+    }
+
+    setVehicles(vehicleData || []);
   }
 
   async function updateTrip(trip: Trip, status?: string) {
