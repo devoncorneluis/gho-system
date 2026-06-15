@@ -341,7 +341,7 @@ export default function TripsPage() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 w-full md:max-w-md">
-                    <input
+                    <select
                       value={trip.driver_name || ""}
                       onChange={(e) =>
                         setTrips((current) =>
@@ -353,8 +353,14 @@ export default function TripsPage() {
                         )
                       }
                       className="border p-3 rounded-lg"
-                      placeholder="Driver name"
-                    />
+                    >
+                      <option value="">Select Driver</option>
+                      {drivers.map((driver) => (
+                        <option key={driver.id} value={driver.full_name || ""}>
+                          {driver.full_name}
+                        </option>
+                      ))}
+                    </select>
 
                     <input
                       value={trip.vehicle_name || ""}
