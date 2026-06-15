@@ -27,7 +27,6 @@ type Vehicle = {
   id: string;
   vehicle_name: string | null;
   registration_number: string | null;
-  driver_id?: string | null;
   assigned_driver?: string | null;
 };
 
@@ -101,7 +100,7 @@ export default function TripsPage() {
 
     const { data: vehicleData, error: vehicleError } = await supabase
       .from("vehicles")
-      .select("id, vehicle_name, registration_number, driver_id, assigned_driver")
+      .select("id, vehicle_name, registration_number, assigned_driver")
       .eq("platform_id", platformId)
       .order("vehicle_name", { ascending: true });
 
