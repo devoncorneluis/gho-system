@@ -1,0 +1,23 @@
+//
+//  ContentView.swift
+//  gho app devon system
+//
+//  Created by Devon on 2026/06/16.
+//
+
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        VStack {
+            Image(systemName: "globe")
+                .imageScale(.large)
+                .foregroundStyle(.tint)
+            Text("Hello, world!")
+        }
+        .padding()
+    }
+}
+
+#Preview {
+    ContentView(
