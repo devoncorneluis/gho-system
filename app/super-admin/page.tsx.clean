@@ -109,24 +109,21 @@ export default function SuperAdminPage() {
       return;
     }
 
-const response = await fetch("/api/create-platform-admin", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    platform_id: adminPlatformId,
-    full_name: adminName,
-    email: adminEmail,
-  }),
-});
+    const { error } = await supabase.from("user_profiles").insert({
+      platform_id: adminPlatformId,
+      full_name: adminName,
+      email: adminEmail,
+      role: "admin",
+      status: "Active",
+      password_note:
+        adminPasswordNote ||
+        "Create user in Supabase Auth, then link user_id later.",
+    });
 
-const result = await response.json();
-
-if (!response.ok) {
-  alert(result.error || "Failed to create platform admin.");
-  return;
-}
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
     setAdminPlatformId("");
     setAdminName("");

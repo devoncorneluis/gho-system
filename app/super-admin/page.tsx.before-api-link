@@ -103,30 +103,66 @@ export default function SuperAdminPage() {
     loadPlatforms();
   }
 
-  async function createPlatformAdmin() {
+  async function createPlatformAdmin() async function createPlatformAdmin() {
+  if (!adminPlatformId || !adminName || !adminEmail) {
+    alert("Platform, admin name, and admin email are required.");
+    return;
+  }
+
+  const temporaryPassword =
+    adminPasswordNote || "Admin123!";
+
+  const response = await fetch("/api/create-platform-admin", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: adminEmail,
+      password: temporaryPassword,
+      full_name: adminName,
+      platform_id: adminPlatformId,
+    }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    alert(result.error || "Failed to create admin.");
+    return;
+  }
+
+  alert(
+    `Platform Admin created.\n\nEmail: ${adminEmail}\nPassword: ${temporaryPassword}`
+  );
+
+  setAdminPlatformId("");
+  setAdminName("");
+  setAdminEmail("");
+  setAdminPasswordNote("");
+
+  loadPlatformAdmins();
+}{
     if (!adminPlatformId || !adminName || !adminEmail) {
       alert("Platform, admin name, and admin email are required.");
       return;
     }
 
-const response = await fetch("/api/create-platform-admin", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    platform_id: adminPlatformId,
-    full_name: adminName,
-    email: adminEmail,
-  }),
-});
+    const { error } = await supabase.from("user_profiles").insert({
+      platform_id: adminPlatformId,
+      full_name: adminName,
+      email: adminEmail,
+      role: "admin",
+      status: "Active",
+      password_note:
+        adminPasswordNote ||
+        "Create user in Supabase Auth, then link user_id later.",
+    });
 
-const result = await response.json();
-
-if (!response.ok) {
-  alert(result.error || "Failed to create platform admin.");
-  return;
-}
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
     setAdminPlatformId("");
     setAdminName("");
