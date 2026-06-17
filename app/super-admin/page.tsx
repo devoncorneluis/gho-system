@@ -103,38 +103,46 @@ export default function SuperAdminPage() {
     loadPlatforms();
   }
 
-  async function createPlatformAdmin() {
-    if (!adminPlatformId || !adminName || !adminEmail) {
-      alert("Platform, admin name, and admin email are required.");
-      return;
-    }
-
-const response = await fetch("/api/create-platform-admin", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    platform_id: adminPlatformId,
-    full_name: adminName,
-    email: adminEmail,
-  }),
-});
-
-const result = await response.json();
-
-if (!response.ok) {
-  alert(result.error || "Failed to create platform admin.");
-  return;
-}
-
-    setAdminPlatformId("");
-    setAdminName("");
-    setAdminEmail("");
-    setAdminPasswordNote("");
-
-    loadPlatformAdmins();
+async function createPlatformAdmin() {
+  if (!adminPlatformId || !adminName || !adminEmail) {
+    alert("Platform, admin name, and admin email are required.");
+    return;
   }
+
+  const temporaryPassword =
+    adminPasswordNote || "Admin123!";
+
+  const response = await fetch("/api/create-platform-admin", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: adminEmail,
+      password: temporaryPassword,
+      full_name: adminName,
+      platform_id: adminPlatformId,
+    }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    alert(result.error || "Failed to create admin.");
+    return;
+  }
+
+  alert(
+    `Platform Admin created.\n\nEmail: ${adminEmail}\nPassword: ${temporaryPassword}`
+  );
+
+  setAdminPlatformId("");
+  setAdminName("");
+  setAdminEmail("");
+  setAdminPasswordNote("");
+
+  loadPlatformAdmins();
+}
 
   useEffect(() => {
     loadPlatforms();
