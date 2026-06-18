@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 
 type Trip = {
@@ -28,31 +28,32 @@ type Passenger = {
   pickup_area: string | null;
   pickup_time: string | null;
 };
-
 export default function TripDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
+
   const [trip, setTrip] = useState<Trip | null>(null);
   const [passengers, setPassengers] = useState<Passenger[]>([]);
 
   async function loadTrip() {
-    const { data } = await supabase
-      .from("trips")
-      .select("*")
-      .eq("id", params.id)
-      .single();
+const { data } = await supabase
+  .from("trips")
+  .select("*")
+  .eq("id", id)
+  .single();
 
-    if (data) {
-      setTrip(data);
-    }
+if (data) {
+  setTrip(data);
+}
 
-    const { data: passengerData } = await supabase
-      .from("trip_passengers")
-      .select("*")
-      .eq("trip_id", params.id)
-      .order("pickup_time");
+const { data: passengerData } = await supabase
+  .from("trip_passengers")
+  .select("*")
+  .eq("trip_id", id)
+  .order("pickup_time");
 
     setPassengers(passengerData || []);
   }

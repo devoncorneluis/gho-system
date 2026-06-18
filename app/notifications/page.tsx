@@ -32,13 +32,11 @@ export default function NotificationsPage() {
 
     setUserEmail(userPlatform.email || "");
 
-    const { data, error } = await supabase
-      .from("notification_logs")
-      .select("*")
-      .eq("platform_id", userPlatform.platformId)
-      .eq("recipient_email", userPlatform.email)
-      .order("created_at", { ascending: false })
-      .limit(100);
+const { data, error } = await supabase
+  .from("notification_logs")
+  .select("*")
+  .order("created_at", { ascending: false })
+  .limit(100);
 
     if (error) {
       alert(error.message);
