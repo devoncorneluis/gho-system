@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
+import TripCard from "../../components/trips/TripCard";
+import TripActions from "../../components/trips/TripActions";
+import AssignmentPanel from "../../components/trips/AssignmentPanel";
+import PassengerManifest from "../../components/trips/PassengerManifest";
 import StatusBadge from "../../components/trips/StatusBadge";
 
 
