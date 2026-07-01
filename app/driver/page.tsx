@@ -43,6 +43,17 @@ type TripPassenger = {
   dropoff_time: string | null;
   pickup_status: string | null;
 };
+type LiveDriver = {
+  driver_id: string;
+  trip_id: string | null;
+  latitude: number;
+  longitude: number;
+  speed: number | null;
+  heading: number | null;
+  accuracy: number | null;
+  is_tracking: boolean;
+  updated_at: string;
+};
 
 export default function DriverPage() {
   const [platformId, setPlatformId] = useState("");
@@ -53,8 +64,9 @@ export default function DriverPage() {
   const [tracking, setTracking] = useState(false);
   const [watchId, setWatchId] = useState<number | null>(null);
   const [locationMessage, setLocationMessage] = useState("");
-
+const [liveDrivers, setLiveDrivers] = useState<LiveDriver[]>([]);
   async function setupDriver() {
+
     const userPlatform = await getUserPlatform();
 
     if (!userPlatform) {
@@ -62,7 +74,7 @@ export default function DriverPage() {
       return;
     }
 
-    setPlatformId(userPlatform.platformId);
+
 
     const { data: driverData } = await supabase
       .from("drivers")
@@ -95,6 +107,21 @@ export default function DriverPage() {
 
     setTrips(data || []);
   }
+  async function loadLiveDrivers() {
+  const { data, error } = await supabase
+    .from("driver_locations")
+    .select(
+      "driver_id, trip_id, latitude, longitude, speed, heading, accuracy, is_tracking, updated_at"
+    )
+    .eq("is_tracking", true);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  setLiveDrivers(data || []);
+}
 
   async function loadPassengers(activePlatformId: string) {
     const { data, error } = await supabase
@@ -207,15 +234,30 @@ await saveDriverLocation(
     setTracking(true);
   }
 
-  function stopGpsTracking() {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-    }
-
-    setWatchId(null);
-    setTracking(false);
-    setLocationMessage("GPS tracking stopped.");
+async function stopGpsTracking() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
   }
+
+  if (driver?.id) {
+    const { error } = await supabase
+      .from("driver_locations")
+      .update({
+        is_tracking: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("driver_id", driver.id);
+
+    if (error) {
+      console.error(error);
+    }
+  }
+
+  setWatchId(null);
+  setTracking(false);
+  setLocationMessage("GPS tracking stopped.");
+}
+
 
   async function updateTripStatus(tripId: string, status: string) {
     const { error } = await supabase
