@@ -6,7 +6,26 @@ import { supabase } from "../../lib/supabase";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+async function forgotPassword() {
+  if (!email.trim()) {
+    alert("Enter your email address first.");
+    return;
+  }
 
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email.trim(),
+    {
+      redirectTo: "http://localhost:3000/reset-password",
+    }
+  );
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  alert("Password reset email sent.");
+}
   async function login() {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
@@ -18,12 +37,14 @@ export default function LoginPage() {
       return;
     }
 
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("role")
-      .eq("user_id", data.user.id)
-      .maybeSingle();
+const { data: profile, error: profileError } = await supabase
+  .from("user_profiles")
+  .select("role")
+  .eq("id", data.user.id)
+  .single();
 
+console.log("PROFILE", profile);
+console.log("PROFILE ERROR", profileError);
     const role = profile?.role;
 
     if (role === "super_admin") {
@@ -101,15 +122,21 @@ export default function LoginPage() {
             type="password"
             placeholder="Password"
           />
+<button
+  onClick={login}
+  className="w-full bg-black text-white font-bold p-4 rounded-2xl shadow-lg"
+>
+  Login
+</button>
 
-          <button
-            onClick={login}
-            className="w-full bg-black text-white font-bold p-4 rounded-2xl shadow-lg"
-          >
-            Login
-          </button>
-        </div>
-      </div>
-    </main>
-  );
+<button
+  onClick={forgotPassword}
+  className="w-full mt-3 text-blue-600 font-semibold"
+>
+  Forgot Password?
+</button>
+</div>
+</div>
+</main>
+);
 }

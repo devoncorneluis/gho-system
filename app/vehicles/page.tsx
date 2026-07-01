@@ -119,20 +119,20 @@ export default function VehiclesPage() {
     loadVehicles();
   }
 
-  useEffect(() => {
-    async function setupPage() {
-      const userPlatform = await getUserPlatform();
+useEffect(() => {
+  async function setupPage() {
+    const userPlatform = await getUserPlatform();
 
-      if (!userPlatform) {
-        window.location.href = "/login";
-        return;
-      }
-
-      setPlatformId(userPlatform.platformId);
+    if (!userPlatform) {
+      window.location.href = "/login";
+      return;
     }
 
-    setupPage();
-  }, []);
+    setPlatformId(userPlatform.platformId);
+  }
+
+  setupPage();
+}, []);
 
   useEffect(() => {
     if (!platformId) return;

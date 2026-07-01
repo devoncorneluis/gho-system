@@ -1,11 +1,16 @@
 "use client";
 
-import { APIProvider, InfoWindow, Map, Marker } from "@vis.gl/react-google-maps";
+import {
+  APIProvider,
+  InfoWindow,
+  Map,
+  Marker,
+} from "@vis.gl/react-google-maps";
 import { useEffect, useState } from "react";
+
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
-
-const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
+import { getUserPlatform } from "../../lib/getUserPlatform";
 
 type DriverLocation = {
   id: string;
@@ -30,16 +35,35 @@ type EmergencyAlertPin = {
 };
 
 export default function LiveMapPage() {
+
+  const [platformId, setPlatformId] = useState<string | null>(null);
+
   const [locations, setLocations] = useState<DriverLocation[]>([]);
   const [emergencies, setEmergencies] = useState<EmergencyAlertPin[]>([]);
   const [selectedEmergency, setSelectedEmergency] =
+    useState<EmergencyAlertPin | null>(null);
+
+  useEffect(() => {
+    async function loadPlatform() {
+      const userPlatform = await getUserPlatform();
+
+      if (!userPlatform) {
+        window.location.href = "/login";
+        return;
+      }
+
+      setPlatformId(userPlatform.platformId);
+    }
+
+    loadPlatform();
+  }, []);
     useState<EmergencyAlertPin | null>(null);
 
   async function loadLocations() {
     const { data, error } = await supabase
       .from("driver_locations")
       .select("*")
-      .eq("platform_id", PLATFORM_ID)
+.eq("platform_id", platformId)
       .order("last_updated", { ascending: false });
 
     if (error) {
@@ -54,7 +78,7 @@ export default function LiveMapPage() {
     const { data, error } = await supabase
       .from("emergency_alerts")
       .select("*")
-      .eq("platform_id", PLATFORM_ID)
+.eq("platform_id", platformId)
       .eq("status", "Open")
       .order("created_at", { ascending: false });
 
@@ -66,18 +90,19 @@ export default function LiveMapPage() {
     setEmergencies(data || []);
   }
 
-  useEffect(() => {
+useEffect(() => {
+  if (!platformId) return;
+
+  loadLocations();
+  loadEmergencies();
+
+  const timer = setInterval(() => {
     loadLocations();
     loadEmergencies();
+  }, 10000);
 
-    const timer = setInterval(() => {
-      loadLocations();
-      loadEmergencies();
-    }, 10000);
-
-    return () => clearInterval(timer);
-  }, []);
-
+  return () => clearInterval(timer);
+}, [platformId]);
   const firstLocation = locations.find(
     (location) => location.latitude && location.longitude
   );

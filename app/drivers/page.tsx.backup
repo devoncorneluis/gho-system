@@ -23,7 +23,7 @@ type Driver = {
   email: string | null;
   license_number: string | null;
   pdp_number: string | null;
-photo_url: string | null;
+  photo_url: string | null;
   assigned_vehicle: string | null;
   assigned_vehicle_id: string | null;
   status: string | null;
@@ -124,51 +124,39 @@ export default function DriversPage() {
       return;
     }
 
-if (!name || !email) {
-  alert("Driver Name and Email Address are required");
-  return;
-}
+    if (!driverNo || !name || !assignedVehicleId) {
+      alert("Driver Number, Full Name, and Vehicle are required");
+      return;
+    }
 
     const selectedVehicle = vehicles.find((vehicle) => vehicle.id === assignedVehicleId);
 
-const { error } = await supabase.from("drivers").insert({
-  platform_id: platformId,
-  full_name: name,
-  phone,
-  email,
-  license_number: licenseNumber,
-  pdp_number: pdpNumber,
-  photo_url: driverPhoto,
-  status: "Available",
-  availability_status: "Available",
-});
-
-if (error) {
-  console.log("DRIVER SAVE ERROR", error);
-  alert(JSON.stringify(error, null, 2));
-  return;
-}
-
-try {
-  await fetch("/api/create-driver-user", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password: "Temp1234!",
-      full_name: name,
+    const { error } = await supabase.from("drivers").insert({
       platform_id: platformId,
-    }),
-  });
-} catch (err) {
-  console.error("Driver login creation failed", err);
-}
+      driver_no: driverNo,
+      driver_code: driverCode,
+      full_name: name,
+      phone,
+      email,
+      license_number: licenseNumber,
+      pdp_number: pdpNumber,
+      photo_url: driverPhoto,
+      assigned_vehicle_id: assignedVehicleId,
+      assigned_vehicle: selectedVehicle
+        ? `${selectedVehicle.vehicle_code || "VEH"} - ${selectedVehicle.vehicle_name} - ${selectedVehicle.registration_number}`
+        : null,
+      status: "Available",
+      availability_status: "Available",
+    });
 
-setDriverNo("");
-setDriverCode("");
-setName("");
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setDriverNo("");
+    setDriverCode("");
+    setName("");
     setPhone("");
     setEmail("");
     setLicenseNumber("");
@@ -201,7 +189,7 @@ setName("");
         email: editingDriver.email,
         license_number: editingDriver.license_number,
         pdp_number: editingDriver.pdp_number,
-photo_url: editingDriver.photo_url,
+        photo_url: editingDriver.photo_url,
         assigned_vehicle_id: editingDriver.assigned_vehicle_id,
         assigned_vehicle: selectedVehicle
           ? `${selectedVehicle.vehicle_code || "VEH"} - ${selectedVehicle.vehicle_name} - ${selectedVehicle.registration_number}`
@@ -305,7 +293,7 @@ photo_url: editingDriver.photo_url,
 
                     setEditingDriver({
                       ...editingDriver,
-photo_url: data.publicUrl,
+                      photo_url: data.publicUrl,
                     });
 
                     setUploading(false);
@@ -318,9 +306,9 @@ photo_url: data.publicUrl,
                   </p>
                 )}
 
-{editingDriver.photo_url && (
-  <img
-    src={editingDriver.photo_url}
+                {editingDriver.photo_url && (
+                  <img
+                    src={editingDriver.photo_url}
                     alt={editingDriver.full_name}
                     className="mt-3 w-32 h-32 object-cover rounded-2xl border"
                   />
@@ -372,62 +360,46 @@ photo_url: data.publicUrl,
           <h2 className="text-xl font-bold mb-4">Add Driver</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-
+            <input value={driverNo} onChange={(e) => setDriverNo(e.target.value)} className="border p-3 rounded-lg" placeholder="Driver Number" />
+            <input value={driverCode} onChange={(e) => setDriverCode(e.target.value)} className="border p-3 rounded-lg" placeholder="Driver Code e.g. DRV001" />
             <input value={name} onChange={(e) => setName(e.target.value)} className="border p-3 rounded-lg" placeholder="Full Name" />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} className="border p-3 rounded-lg" placeholder="Phone Number" />
             <input value={email} onChange={(e) => setEmail(e.target.value)} className="border p-3 rounded-lg" placeholder="Email Address" />
             <input value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} className="border p-3 rounded-lg" placeholder="License Number" />
             <input value={pdpNumber} onChange={(e) => setPdpNumber(e.target.value)} className="border p-3 rounded-lg" placeholder="PDP Number" />
 
-<input
-  className="border p-3 rounded-lg"
-  placeholder="Registration Number"
-/>
+            <select
+              value={assignedVehicleId}
+              onChange={(e) => setAssignedVehicleId(e.target.value)}
+              className="border p-3 rounded-lg"
+            >
+              <option value="">Select Vehicle</option>
+              {vehicles.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {vehicle.vehicle_code || "VEH"} - {vehicle.vehicle_name} - {vehicle.registration_number}
+                </option>
+              ))}
+            </select>
 
-<input
-  className="border p-3 rounded-lg"
-  placeholder="Vehicle Type"
-/>
+<h2>Add Driver</h2>
 
-<input
-  className="border p-3 rounded-lg"
-  placeholder="Vehicle Colour"
-/>
+REPLACE EVERYTHING HERE
+↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
-            <div className="border rounded-lg p-3">
-              <label className="block font-bold text-[#061B33] mb-2">
-                Driver Photo
-              </label>
+<div className="grid ...">
+  Driver Number
+  Driver Code
+  Name
+  Phone
+  ...
+</div>
 
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) uploadDriverPhoto(file);
-                }}
-              />
+↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+WITH THE NEW FORM
 
-              {uploading && (
-                <p className="text-orange-500 font-bold mt-2">
-                  Uploading photo...
-                </p>
-              )}
-
-              {driverPhoto && (
-                <img
-                  src={driverPhoto}
-                  alt="Driver preview"
-                  className="mt-3 w-32 h-32 object-cover rounded-2xl border"
-                />
-              )}
-            </div>
-          </div>
-
-          <button onClick={saveDriver} className="mt-6 bg-orange-500 text-white px-6 py-3 rounded-lg font-bold">
-            Save Driver
-          </button>
+<button onClick={saveDriver}>
+  Save Driver
+</button>
         </div>
 
         <div className="bg-white rounded-xl shadow p-6 mt-6">
@@ -441,9 +413,9 @@ photo_url: data.publicUrl,
                 <div key={driver.id ?? driver.driver_no} className="border rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow bg-slate-50">
                   <div className="flex flex-col md:flex-row md:items-center gap-4">
                     <div className="w-28 h-28 rounded-3xl overflow-hidden bg-gray-200 flex items-center justify-center">
-{driver.photo_url ? (
-  <img
-    src={driver.photo_url}
+                      {driver.photo_url ? (
+                        <img
+                          src={driver.photo_url}
                           alt={driver.full_name}
                           className="w-full h-full object-cover"
                         />

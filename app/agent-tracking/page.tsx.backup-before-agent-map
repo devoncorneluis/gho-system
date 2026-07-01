@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import UserTopBar from "../../components/UserTopBar";
 
-const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
+const PLATFORM_ID = "5ab161d1-690f-4d2f-977c-f4e6ee23be06";
 
 // Demo pickup point: Bishop Lavis area
 const PICKUP_LOCATION = {
