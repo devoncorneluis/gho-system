@@ -21,6 +21,7 @@ type Trip = {
 };
 
 type Driver = {
+  id: string;
   full_name: string;
   driver_code: string | null;
   phone: string | null;
@@ -109,7 +110,14 @@ export default function DriverPage() {
     setPassengers(data || []);
   }
 
-  async function saveDriverLocation(latitude: number, longitude: number) {
+async function saveDriverLocation(
+  latitude: number,
+  longitude: number,
+  speed: number | null,
+  heading: number | null,
+  accuracy: number | null,
+  tripId: string | null
+) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -119,45 +127,50 @@ export default function DriverPage() {
       return;
     }
 
-    const { data: existing } = await supabase
-      .from("driver_locations")
-      .select("id")
-      .eq("platform_id", platformId)
-      .eq("driver_email", user.email)
-      .limit(1)
-      .maybeSingle();
+const { data: existing } = await supabase
+  .from("driver_locations")
+  .select("id")
+  .eq("driver_id", driver.id)
+  .limit(1)
+  .maybeSingle();
 
     if (existing?.id) {
-      await supabase
-        .from("driver_locations")
-        .update({
-          driver_name: driver.full_name,
-          latitude,
-          longitude,
-          status: "Online",
-          last_updated: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
+await supabase
+  .from("driver_locations")
+  .update({
+    trip_id: tripId,
+    latitude,
+    longitude,
+    speed,
+    heading,
+    accuracy,
+    is_tracking: true,
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", existing.id);
     } else {
-      await supabase.from("driver_locations").insert({
-        platform_id: platformId,
-        driver_name: driver.full_name,
-        driver_email: user.email,
-        latitude,
-        longitude,
-        status: "Online",
-        last_updated: new Date().toISOString(),
-      });
+await supabase.from("driver_locations").insert({
+  driver_id: driver.id,
+  trip_id: tripId,
+  latitude,
+  longitude,
+  speed,
+  heading,
+  accuracy,
+  is_tracking: true,
+  updated_at: new Date().toISOString(),
+});
     }
 
-    await supabase.from("driver_location_history").insert({
-      platform_id: platformId,
-      driver_name: driver.full_name,
-      latitude,
-      longitude,
-      speed: null,
-      recorded_at: new Date().toISOString(),
-    });
+await supabase.from("driver_location_history").insert({
+  driver_id: driver.id,
+  trip_id: tripId,
+  latitude,
+  longitude,
+  speed,
+  heading,
+  recorded_at: new Date().toISOString(),
+});
   }
 
   function startGpsTracking() {
@@ -168,10 +181,14 @@ export default function DriverPage() {
 
     const id = navigator.geolocation.watchPosition(
       async (position) => {
-        await saveDriverLocation(
-          position.coords.latitude,
-          position.coords.longitude
-        );
+await saveDriverLocation(
+  position.coords.latitude,
+  position.coords.longitude,
+  position.coords.speed,
+  position.coords.heading,
+  position.coords.accuracy,
+  selectedTripId
+);
 
         setTracking(true);
         setLocationMessage("Signed in successfully. GPS tracking active.");
