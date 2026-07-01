@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
+import StatusBadge from "../../components/trips/StatusBadge";
 
 
 
