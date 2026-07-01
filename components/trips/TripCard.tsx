@@ -1,0 +1,1 @@
+import { ReactNode } from "react";type Props = {  children: ReactNode;};export default function TripCard({ children }: Props) {  return (    <div className="rounded-2xl border bg-slate-50 p-5 shadow-sm">      {children}    </div>  );}
