@@ -4,7 +4,7 @@ import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
 
 type Activity = {  id: string;  title: string;  created_at: string;};
-type FleetDriver = {  driver_name: string;  trip_code: string | null;  vehicle_name: string | null;  speed: number | null;  is_tracking: boolean;  updated_at: string;};
+type FleetDriver = {  driver_id: string;  driver_name: string;  trip_code: string | null;  vehicle_name: string | null;  speed: number | null;  is_tracking: boolean;  updated_at: string;};
 
 export default function LiveDispatchPage() {
   const [driversOnline, setDriversOnline] = useState(0);
@@ -43,7 +43,7 @@ export default function LiveDispatchPage() {
 
   async function loadActivities() {  const { data, error } = await supabase    .from("notification_logs")    .select("id, title, created_at")    .order("created_at", { ascending: false })    .limit(10);  if (error) {    console.error(error.message);    return;  }  setActivities(data || []);}
 
-  async function loadFleet() {  const { data, error } = await supabase    .from("driver_locations")    .select(`      speed,      updated_at,      is_tracking,      drivers(full_name),      trips(trip_code),      vehicles(vehicle_name)    `);  if (error) {    console.error(error.message);    return;  }  setFleet(    (data || []).map((item: any) => ({      driver_name: item.drivers?.full_name ?? "Unknown",      trip_code: item.trips?.trip_code ?? "-",      vehicle_name: item.vehicles?.vehicle_name ?? "-",      speed: item.speed,      is_tracking: item.is_tracking,      updated_at: item.updated_at,    }))  );}
+  async function loadFleet() {  const { data, error } = await supabase    .from("driver_locations")    .select(`      driver_id,      speed,      updated_at,      is_tracking,      drivers(full_name),      trips(trip_code),      vehicles(vehicle_name)    `);  if (error) {    console.error(error.message);    return;  }  setFleet(    (data || []).map((item: any) => ({      driver_id: item.driver_id,      driver_name: item.drivers?.full_name ?? "Unknown",      trip_code: item.trips?.trip_code ?? "-",      vehicle_name: item.vehicles?.vehicle_name ?? "-",      speed: item.speed,      is_tracking: item.is_tracking,      updated_at: item.updated_at,    }))  );}
 
   useEffect(() => {
     loadDashboard();
@@ -146,7 +146,16 @@ export default function LiveDispatchPage() {
                     <tbody>
                       {fleet.map((driver, index) => (
                         <tr key={index} className="border-b">
-                          <td className="py-2">{driver.driver_name}</td>
+                          <td className="py-2">
+                        <button
+                          onClick={() =>
+                            (window.location.href = `/live-dispatch/${driver.driver_id}`)
+                          }
+                          className="font-bold text-blue-600 hover:underline"
+                        >
+                          {driver.driver_name}
+                        </button>
+                      </td>
                           <td>{driver.trip_code}</td>
                           <td>{driver.vehicle_name}</td>
                           <td>{Math.round(driver.speed ?? 0)} km/h</td>
