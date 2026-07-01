@@ -6,7 +6,6 @@ import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import TripCard from "../../components/trips/TripCard";
 import TripActions from "../../components/trips/TripActions";
-import AssignmentPanel from "../../components/trips/AssignmentPanel";
 import PassengerManifest from "../../components/trips/PassengerManifest";
 import StatusBadge from "../../components/trips/StatusBadge";
 
@@ -61,6 +60,9 @@ export default function TripsPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [search, setSearch] = useState("");
   const [platformId, setPlatformId] = useState<string | null>(null);
+
+  type LiveDriver = {  driver_id: string;  driver_name?: string;  trip_id: string | null;  latitude: number;  longitude: number;  speed: number | null;  heading: number | null;  accuracy: number | null;  is_tracking: boolean;  updated_at: string;};
+  const [liveDrivers, setLiveDrivers] = useState<LiveDriver[]>([]);
 
   async function loadTrips() {
     if (!platformId) return;
@@ -117,6 +119,8 @@ export default function TripsPage() {
     setVehicles(vehicleData || []);
   }
 
+  async function loadLiveDrivers() {  const { data, error } = await supabase    .from("driver_locations")    .select(`      driver_id,      trip_id,      latitude,      longitude,      speed,      heading,      accuracy,      is_tracking,      updated_at,      drivers(full_name)`    )    .eq("is_tracking", true);  if (error) {    console.error(error.message);    return;  }  setLiveDrivers(    (data || []).map((item: any) => ({      ...item,      driver_name: item.drivers?.full_name ?? "Unknown Driver",    }))  );}
+
   async function updateTrip(trip: Trip, status?: string) {
     if (!platformId) {
       alert("Platform not loaded yet.");
@@ -147,6 +151,26 @@ export default function TripsPage() {
     }
 
     loadTrips();
+  }
+
+  async function startTrip(trip: Trip) {
+    await updateTrip(trip, "In Progress");
+  }
+
+  async function completeTrip(trip: Trip) {
+    await updateTrip(trip, "Completed");
+  }
+
+  async function cancelTrip(trip: Trip) {
+    await updateTrip(trip, "Cancelled");
+  }
+
+  async function saveDriver(trip: Trip) {
+    await updateTrip(trip);
+  }
+
+  function saveVehicle(trip: Trip) {
+    // Vehicle assignment is persisted together with driver assignment.
   }
 
   async function createAssignmentNotifications(trip: Trip) {
@@ -264,9 +288,18 @@ export default function TripsPage() {
   }, []);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      loadLiveDrivers();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     if (!platformId) return;
 
     loadTrips();
+    loadLiveDrivers();
   }, [platformId]);
 
   const filteredTrips = trips.filter((trip) => {
@@ -311,6 +344,65 @@ export default function TripsPage() {
           </div>
         </div>
 
+        {/* Live Driver Tracking */}
+        <div className="bg-white rounded-xl shadow p-6 mt-6">
+          <h2 className="text-2xl font-bold text-[#061B33]">
+            📍 Live Driver Tracking
+          </h2>
+          <p className="text-gray-500 mb-4">
+            Drivers currently transmitting live GPS.
+          </p>
+          {liveDrivers.length === 0 ? (
+            <p className="text-gray-500">
+              No drivers are currently tracking.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {liveDrivers.map((driver) => (
+                <div
+                  key={driver.driver_id}
+                  className="rounded-xl border bg-green-50 p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-lg">
+                        🟢 {driver.driver_name}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Trip: {driver.trip_id ?? "Not Assigned"}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Speed: {Math.round(driver.speed ?? 0)} km/h
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Last Update: {" "}
+                        {new Date(driver.updated_at).toLocaleTimeString()}
+                      </p>
+                    </div>
+                    <div>
+                      {driver.is_tracking ? (
+                        (driver.speed ?? 0) > 5 ? (
+                          <span className="rounded-full bg-green-100 px-3 py-1 font-bold text-green-700">
+                            🟢 MOVING
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-yellow-100 px-3 py-1 font-bold text-yellow-700">
+                            🟡 IDLE
+                          </span>
+                        )
+                      ) : (
+                        <span className="rounded-full bg-red-100 px-3 py-1 font-bold text-red-700">
+                          🔴 OFFLINE
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="bg-white rounded-xl shadow p-6 mt-6">
           <input
             value={search}
@@ -329,7 +421,7 @@ export default function TripsPage() {
 
           <div className="space-y-4">
             {filteredTrips.map((trip) => (
-              <div key={trip.id} className="border rounded-2xl p-5 bg-slate-50">
+              <TripCard key={trip.id}>
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                   <div>
                     <p className="text-2xl font-bold text-[#061B33]">
@@ -342,7 +434,7 @@ export default function TripsPage() {
                     <p><strong>Drop-off:</strong> {trip.dropoff_time}</p>
                     <p><strong>Passengers:</strong> {trip.passenger_count}</p>
                     <p><strong>Estimated KM:</strong> {trip.estimated_km ? `${trip.estimated_km} km` : "Not set"}</p>
-                    <p><strong>Status:</strong> {trip.status}</p>
+                    <p><strong>Status:</strong> <StatusBadge status={trip.status} /></p>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 w-full md:max-w-md">
@@ -462,7 +554,7 @@ export default function TripsPage() {
                     </div>
                   )}
                 </div>
-              </div>
+            </TripCard>
             ))}
           </div>
         </div>
