@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-console.log(
-  "SERVICE KEY EXISTS:",
-  !!process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { authorizePrivilegedRoute } from "../../../lib/security/privilegedRouteGuard";
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -11,12 +9,24 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: Request) {
   try {
+    const authResult = await authorizePrivilegedRoute(request, ["super_admin"]);
+    if (!authResult.ok) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const {
       email,
       password,
       full_name,
       platform_id,
     } = await request.json();
+
+    if (!email || !password || !full_name || !platform_id) {
+      return NextResponse.json(
+        { error: "email, password, full_name, and platform_id are required." },
+        { status: 400 }
+      );
+    }
 
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
