@@ -35,6 +35,17 @@ type ReleaseDashboardData = {
     performanceStatus: string;
     disasterRecoveryStatus: string;
   };
+  uat: {
+    roles: Array<{
+      id: "super_admin" | "platform_admin" | "dispatcher" | "driver" | "client" | "executive";
+      name: string;
+      status: string;
+      state: "not_started" | "in_progress" | "complete" | "blocked";
+    }>;
+    startedCount: number;
+    completeCount: number;
+    totalRoles: number;
+  };
   releaseReadiness: {
     architecture: string;
     security: string;
@@ -159,6 +170,39 @@ function extractValidationResult(validationMarkdown: string, activityName: strin
   const match = validationMarkdown.match(rowPattern);
   if (!match?.[1]) {
     return "Unknown";
+  }
+
+  return normalizeStatus(match[1]);
+}
+
+function mapUatState(status: string): "not_started" | "in_progress" | "complete" | "blocked" {
+  const normalized = normalizeStatus(status);
+
+  if (normalized === "Complete") {
+    return "complete";
+  }
+
+  if (normalized === "Blocked") {
+    return "blocked";
+  }
+
+  if (normalized === "In Progress" || normalized === "At Risk") {
+    return "in_progress";
+  }
+
+  return "not_started";
+}
+
+function extractUatRoleStatus(uatMarkdown: string, roleName: string): string {
+  const escapedRole = roleName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const rowPattern = new RegExp(
+    `\\|\\s*${escapedRole}\\s*\\|[^\\n]+\\|\\s*([^|]+)\\|\\s*[^|]+\\|\\s*[^|]+\\|\\s*[^|]+\\|\\s*[^|]+\\|`,
+    "im"
+  );
+  const match = uatMarkdown.match(rowPattern);
+
+  if (!match?.[1]) {
+    return "Not Started";
   }
 
   return normalizeStatus(match[1]);
@@ -299,6 +343,7 @@ export async function GET() {
   const readinessChecklist = await readDoc("ReadinessChecklist.md");
   const securityFindings = await readDoc("security/SecurityFindings.md");
   const validationEvidence = await readDoc("validation/ValidationEvidence.md");
+  const userAcceptanceTesting = await readDoc("validation/UserAcceptanceTesting.md");
   const rc3Stabilization = await readDoc("releases/RC3-Stabilization.md");
 
   const architecture = extractReadinessArea(readinessChecklist, "Architecture");
@@ -319,6 +364,25 @@ export async function GET() {
   const performanceBaselineStatus = extractValidationResult(validationEvidence, "Performance baseline capture");
   const disasterRecoveryStatus = extractValidationResult(validationEvidence, "Disaster recovery drill report");
   const testPassRate = extractTestPassRate(validationEvidence);
+
+  const uatRoles = [
+    { id: "super_admin", name: "Super Admin", status: extractUatRoleStatus(userAcceptanceTesting, "Super Admin"), state: "not_started" },
+    { id: "platform_admin", name: "Platform Admin", status: extractUatRoleStatus(userAcceptanceTesting, "Platform Admin"), state: "not_started" },
+    { id: "dispatcher", name: "Dispatcher", status: extractUatRoleStatus(userAcceptanceTesting, "Dispatcher"), state: "not_started" },
+    { id: "driver", name: "Driver", status: extractUatRoleStatus(userAcceptanceTesting, "Driver"), state: "not_started" },
+    { id: "client", name: "Client", status: extractUatRoleStatus(userAcceptanceTesting, "Client"), state: "not_started" },
+    { id: "executive", name: "Executive", status: extractUatRoleStatus(userAcceptanceTesting, "Executive"), state: "not_started" },
+  ] as const;
+
+  const normalizedUatRoles: ReleaseDashboardData["uat"]["roles"] = uatRoles.map((role) => ({
+    ...role,
+    state: mapUatState(role.status),
+  }));
+
+  const startedCount = normalizedUatRoles.filter(
+    (role) => role.state === "in_progress" || role.state === "complete"
+  ).length;
+  const completeCount = normalizedUatRoles.filter((role) => role.state === "complete").length;
 
   const gates = computeGateState({
     securityStatus: security,
@@ -377,6 +441,12 @@ export async function GET() {
       uatStatus: uatProgress,
       performanceStatus: performanceBaselineStatus,
       disasterRecoveryStatus,
+    },
+    uat: {
+      roles: normalizedUatRoles,
+      startedCount,
+      completeCount,
+      totalRoles: normalizedUatRoles.length,
     },
     releaseReadiness: {
       architecture,

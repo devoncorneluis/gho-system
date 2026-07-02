@@ -40,6 +40,17 @@ type DashboardPayload = {
     performanceStatus: string;
     disasterRecoveryStatus: string;
   };
+  uat: {
+    roles: Array<{
+      id: "super_admin" | "platform_admin" | "dispatcher" | "driver" | "client" | "executive";
+      name: string;
+      status: string;
+      state: "not_started" | "in_progress" | "complete" | "blocked";
+    }>;
+    startedCount: number;
+    completeCount: number;
+    totalRoles: number;
+  };
   releaseReadiness: {
     architecture: ReleaseStatus;
     security: ReleaseStatus;
@@ -97,6 +108,22 @@ function gateBadge(gate: GateState) {
   }
 
   return { label: "In Progress", icon: "🟡", classes: "bg-amber-100 text-amber-800 border-amber-200" };
+}
+
+function uatBadge(state: "not_started" | "in_progress" | "complete" | "blocked") {
+  if (state === "complete") {
+    return { icon: "🟢", label: "Complete", classes: "bg-green-100 text-green-800 border-green-200" };
+  }
+
+  if (state === "blocked") {
+    return { icon: "🔴", label: "Blocked", classes: "bg-red-100 text-red-800 border-red-200" };
+  }
+
+  if (state === "in_progress") {
+    return { icon: "🟡", label: "In Progress", classes: "bg-amber-100 text-amber-800 border-amber-200" };
+  }
+
+  return { icon: "⚪", label: "Not Started", classes: "bg-gray-100 text-gray-700 border-gray-200" };
 }
 
 function MetricCard({ title, value }: { title: string; value: string | number }) {
@@ -314,6 +341,38 @@ export default function ReleaseDashboardPage() {
                 <MetricCard title="Performance baseline" value={data.metrics.performanceBaselineStatus} />
                 <MetricCard title="Disaster recovery" value={data.metrics.disasterRecoveryStatus} />
                 <MetricCard title="Release recommendation" value={data.metrics.overallRecommendation} />
+              </div>
+            </section>
+
+            <section className="mt-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h2 className="text-2xl font-black text-[#061B33]">Gate 2 - UAT Progress</h2>
+              <p className="mt-2 text-sm text-gray-600">
+                Role-level status is derived from documented execution evidence in validation artifacts.
+              </p>
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {data.uat.roles.map((role) => {
+                  const badge = uatBadge(role.state);
+                  return (
+                    <div key={role.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <p className="text-sm font-bold text-[#061B33]">{role.name}</p>
+                      <div
+                        className={`mt-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${badge.classes}`}
+                      >
+                        <span>{badge.icon}</span>
+                        <span>{badge.label}</span>
+                      </div>
+                      <p className="mt-2 text-xs font-medium text-gray-600">Evidence status: {role.status}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-sm font-semibold text-[#061B33]">
+                  Overall: {data.uat.startedCount} / {data.uat.totalRoles} Started
+                </p>
+                <p className="mt-1 text-sm font-semibold text-[#061B33]">
+                  {data.uat.completeCount} / {data.uat.totalRoles} Complete
+                </p>
               </div>
             </section>
 

@@ -9,6 +9,7 @@ This document is the central index of validation artifacts.
 | Activity | Artifact Link | Date | Owner | Result |
 | --- | --- | --- | --- | --- |
 | Validation plan approval | [ValidationPlan.md](ValidationPlan.md) | 2026-07-02 | Release Governance Board | In Progress |
+| UAT dataset seed provisioning | [UATDataSeed.md](UATDataSeed.md) | 2026-07-02 | Engineering | Complete (deterministic tenant and role seed script prepared) |
 | UAT execution summary | [UserAcceptanceTesting.md](UserAcceptanceTesting.md) | 2026-07-02 | GitHub Copilot | In Progress (Gate 2 Run 1 executed; credentialed E2E still pending) |
 | Role workflow access verification | [UserAcceptanceTesting.md](UserAcceptanceTesting.md) | 2026-07-02 | GitHub Copilot | Complete (local execution run captured for Super Admin, Platform Admin/Dispatcher, Driver, Client, Executive routes) |
 | Load testing report | [LoadTestPlan.md](LoadTestPlan.md) | 2026-07-02 | Performance Owner (TBD) | Not Started |
@@ -32,8 +33,9 @@ For each completed activity, add:
 ## Traceability
 
 1. Validation master: [ValidationPlan.md](ValidationPlan.md)
-2. UAT scripts: [UserAcceptanceTesting.md](UserAcceptanceTesting.md)
-3. Load testing: [LoadTestPlan.md](LoadTestPlan.md)
-4. Recovery: [DisasterRecoveryPlan.md](DisasterRecoveryPlan.md)
-5. Performance: [PerformanceBaseline.md](PerformanceBaseline.md)
-6. Acceptance gates: [ProductionAcceptanceCriteria.md](ProductionAcceptanceCriteria.md)
+2. UAT dataset seed: [UATDataSeed.md](UATDataSeed.md)
+3. UAT scripts: [UserAcceptanceTesting.md](UserAcceptanceTesting.md)
+4. Load testing: [LoadTestPlan.md](LoadTestPlan.md)
+5. Recovery: [DisasterRecoveryPlan.md](DisasterRecoveryPlan.md)
+6. Performance: [PerformanceBaseline.md](PerformanceBaseline.md)
+7. Acceptance gates: [ProductionAcceptanceCriteria.md](ProductionAcceptanceCriteria.md)
