@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
+import {
+  updateTripStatus as dispatchUpdateTripStatus,
+  acceptDriverDispatch,
+  rejectDriverDispatch,
+} from "../../lib/dispatchService";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 
 type Trip = {
   id: string;
@@ -16,6 +22,7 @@ type Trip = {
   vehicle_registration: string | null;
   passenger_count: number | null;
   driver_name: string | null;
+  driver_response?: string | null;
   status: string | null;
   estimated_km?: number | null;
 };
@@ -57,8 +64,10 @@ type LiveDriver = {
 
 export default function DriverPage() {
   const [platformId, setPlatformId] = useState("");
+  const [userId, setUserId] = useState("");
   const [driver, setDriver] = useState<Driver | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [processing, setProcessing] = useState<string[]>([]);
   const [passengers, setPassengers] = useState<TripPassenger[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [tracking, setTracking] = useState(false);
@@ -84,6 +93,8 @@ const [liveDrivers, setLiveDrivers] = useState<LiveDriver[]>([]);
       .maybeSingle();
 
     setDriver(driverData || null);
+    setPlatformId(userPlatform.platformId);
+    setUserId(userPlatform.userId);
 
     if (driverData?.full_name) {
       await loadTrips(userPlatform.platformId, driverData.full_name);
@@ -260,10 +271,16 @@ async function stopGpsTracking() {
 
 
   async function updateTripStatus(tripId: string, status: string) {
+    if (!platformId) {
+      alert("Driver platform context is not loaded.");
+      return;
+    }
+
     const { error } = await supabase
       .from("trips")
       .update({ status })
-      .eq("id", tripId);
+      .eq("id", tripId)
+      .eq("platform_id", platformId);
 
     if (error) {
       alert(error.message);
@@ -271,6 +288,55 @@ async function stopGpsTracking() {
     }
 
     setupDriver();
+  }
+
+  async function acceptTrip(trip: Trip) {
+    if (!trip.status) {
+      alert("This trip has no current status.");
+      return;
+    }
+
+    const prev = trips.find((t) => t.id === trip.id) || null;
+    setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? { ...t, driver_name: t.driver_name, status: t.status, } : t)));
+    // optimistic set driver_response
+    setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? { ...t, driver_response: "accepted" } : t)));
+    setProcessing((s) => (s.includes(trip.id) ? s : [...s, trip.id]));
+
+    try {
+      await acceptDriverDispatch(trip.id, platformId, userId);
+    } catch (error: any) {
+      console.error(error);
+      // revert
+      if (prev) {
+        setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? prev : t)));
+      }
+      alert("Unable to accept trip.");
+    } finally {
+      setProcessing((s) => s.filter((x) => x !== trip.id));
+    }
+  }
+
+  async function rejectTrip(trip: Trip) {
+    if (!trip.status) {
+      alert("This trip has no current status.");
+      return;
+    }
+
+    const prev = trips.find((t) => t.id === trip.id) || null;
+    setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? { ...t, driver_response: "rejected" } : t)));
+    setProcessing((s) => (s.includes(trip.id) ? s : [...s, trip.id]));
+
+    try {
+      await rejectDriverDispatch(trip.id, platformId, userId);
+    } catch (error: any) {
+      console.error(error);
+      if (prev) {
+        setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? prev : t)));
+      }
+      alert("Unable to reject trip.");
+    } finally {
+      setProcessing((s) => s.filter((x) => x !== trip.id));
+    }
   }
 
   async function updatePassengerStatus(passengerId: string, status: string) {
@@ -422,15 +488,36 @@ async function stopGpsTracking() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 mt-5">
-                      <button
-                        onClick={() => {
-                          setSelectedTripId(trip.id);
-                          updateTripStatus(trip.id, "In Progress");
-                        }}
-                        className="border rounded-xl px-3 py-3 font-bold"
-                      >
-                        Start Trip
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedTripId(trip.id);
+                            updateTripStatus(trip.id, "In Progress");
+                          }}
+                          className="border rounded-xl px-3 py-3 font-bold"
+                        >
+                          Start Trip
+                        </button>
+
+                        {(trip.driver_response === null || trip.driver_response === "" || trip.driver_response === "pending") && (
+                          <>
+                            <button
+                              onClick={() => acceptTrip(trip)}
+                              disabled={processing.includes(trip.id)}
+                              className={`px-3 py-3 rounded-xl font-bold ${processing.includes(trip.id) ? "bg-gray-200 text-gray-400" : "bg-green-50 text-green-700"}`}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => rejectTrip(trip)}
+                              disabled={processing.includes(trip.id)}
+                              className={`px-3 py-3 rounded-xl font-bold ${processing.includes(trip.id) ? "bg-gray-200 text-gray-400" : "bg-red-50 text-red-700"}`}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
 
                       <button
                         onClick={() =>

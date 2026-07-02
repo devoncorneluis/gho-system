@@ -112,13 +112,19 @@ export default function TripDetailPage({
 }
     if (!trip) return;
 
+    if (!trip.platform_id) {
+      alert("Trip platform context is missing.");
+      return;
+    }
+
     const { error } = await supabase
       .from("trips")
       .update({
         status: "In Progress",
         started_at: new Date().toISOString(),
       })
-      .eq("id", trip.id);
+      .eq("id", trip.id)
+      .eq("platform_id", trip.platform_id);
 
     if (error) {
       alert(error.message);
@@ -145,7 +151,8 @@ export default function TripDetailPage({
             .update({
               last_location_update: new Date().toISOString(),
             })
-            .eq("id", trip.driver_id);
+            .eq("id", trip.driver_id)
+            .eq("platform_id", trip.platform_id);
         },
         (error) => {
           console.error(error);
@@ -163,13 +170,19 @@ export default function TripDetailPage({
 
     if (!confirm("Complete this trip?")) return;
 
+    if (!trip.platform_id) {
+      alert("Trip platform context is missing.");
+      return;
+    }
+
     const { error } = await supabase
       .from("trips")
       .update({
         status: "Completed",
         completed_at: new Date().toISOString(),
       })
-      .eq("id", trip.id);
+      .eq("id", trip.id)
+      .eq("platform_id", trip.platform_id);
 
     if (error) {
       alert(error.message);
@@ -181,7 +194,8 @@ export default function TripDetailPage({
       .update({
         pickup_status: "Completed",
       })
-      .eq("trip_id", trip.id);
+      .eq("trip_id", trip.id)
+      .eq("platform_id", trip.platform_id);
 
     if (trip.driver_id) {
       await supabase
@@ -190,7 +204,8 @@ export default function TripDetailPage({
           status: "Available",
           availability_status: "Available",
         })
-        .eq("id", trip.driver_id);
+        .eq("id", trip.driver_id)
+        .eq("platform_id", trip.platform_id);
     }
 
     if (trip.vehicle_id) {
@@ -201,7 +216,8 @@ export default function TripDetailPage({
           availability_status: "Available",
           assigned_driver: null,
         })
-        .eq("id", trip.vehicle_id);
+        .eq("id", trip.vehicle_id)
+        .eq("platform_id", trip.platform_id);
     }
 
     await loadTrip();

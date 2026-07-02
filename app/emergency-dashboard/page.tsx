@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
+import EmergencyCard from "../../components/emergency/EmergencyCard";
 import { supabase } from "../../lib/supabase";
 
 const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
@@ -49,7 +50,8 @@ export default function EmergencyDashboardPage() {
         status: "Acknowledged",
         acknowledged_at: new Date().toISOString(),
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("platform_id", PLATFORM_ID);
 
     if (error) {
       alert(error.message);
@@ -73,7 +75,8 @@ export default function EmergencyDashboardPage() {
         status: "Response Assigned",
         assigned_agent: assignedAgent,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("platform_id", PLATFORM_ID);
 
     if (error) {
       alert(error.message);
@@ -99,7 +102,8 @@ export default function EmergencyDashboardPage() {
         resolution_notes: resolutionNotes,
         resolved_at: new Date().toISOString(),
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("platform_id", PLATFORM_ID);
 
     if (error) {
       alert(error.message);
@@ -139,6 +143,16 @@ export default function EmergencyDashboardPage() {
         <p className="text-gray-600 mt-2">
           Manage emergency workflow from open alert to response assignment and resolution.
         </p>
+
+        <div className="mt-6">
+          <EmergencyCard
+            driver="John Smith"
+            vehicle="Toyota Quantum"
+            trip="GHO-104"
+            passengers={11}
+            status="SOS ACTIVE"
+          />
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-6">
           <div className="bg-red-50 border border-red-300 rounded-xl shadow p-5">
