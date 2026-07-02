@@ -12,8 +12,8 @@ This document is a release-governance artifact, not only a remediation tracker. 
 | --- | --- |
 | Total Findings | 7 |
 | Critical Blocked | 0 |
-| High Blocked | 1 |
-| Medium Blocked | 3 |
+| High Blocked | 0 |
+| Medium Blocked | 2 |
 | Low Blocked | 1 |
 | Overall Security Status | In Progress |
 | Release Recommendation | Blocked |
@@ -63,7 +63,7 @@ Batch priority is launch-driven and may be stricter than the initial finding sev
 | SEC-001 | High | TBD | TBD | RC3 Stabilization | Blocked | Yes |
 | SEC-002 | High | TBD | TBD | RC3 Stabilization | In Progress | Yes |
 | SEC-003 | High | TBD | TBD | RC3 Stabilization | In Progress | Yes |
-| SEC-004 | High | TBD | TBD | RC3 Stabilization | Blocked | Yes |
+| SEC-004 | High | TBD | TBD | RC3 Stabilization | In Progress | Yes |
 | SEC-005 | Medium | TBD | TBD | RC3 Stabilization | Blocked | No |
 | SEC-006 | Medium | TBD | TBD | RC3 Stabilization | Blocked | No |
 | SEC-007 | Low | TBD | TBD | RC3 Stabilization | Blocked | No |
@@ -80,7 +80,7 @@ Scope:
 | SEC-001 | Complete (platform-scoped mutation guards implemented) | Complete (commit 2e50857) | Complete (npm run test:run, 25/25 tests) | Complete (integration suite included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
 | SEC-002 | Complete (route-level authorization guards implemented) | Complete (commit d164142) | Complete (npm run test:run, 25/25 tests) | Complete (integration suite included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
 | SEC-003 | Complete (tenant RLS policy artifact added for required tenant tables) | Complete (commit 889a1e1) | Complete (npm run test:run, 29/29 tests) | Complete (policy artifact coverage included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
-| SEC-004 | Not Started | Not Started | Not Started | Not Started | Complete (latest build pass) | Not Started | Not Started |
+| SEC-004 | Complete (centralized emergency transition service with durable audit writes) | Complete (commit 2a523c2) | Complete (npm run test:run, 33/33 tests) | Complete (emergency transition integration test included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
 
 Evidence reference note:
 
@@ -144,6 +144,7 @@ Execution sequence per finding:
 - SEC-001: Platform-scoped mutation guards implemented in shared and page-level trip workflows. Awaiting reviewer approval for closure.
 - SEC-002: Route-level caller authorization and platform assignment guards implemented for privileged user-creation endpoints. Awaiting independent reviewer approval for closure.
 - SEC-003: Repository RLS policy artifact and tenant policy coverage tests added for tenant-sensitive tables. Awaiting independent reviewer approval for closure.
+- SEC-004: Emergency acknowledge, assign, and resolve transitions now flow through a centralized audited service with dedicated unit and integration evidence. Awaiting independent reviewer approval for closure.
 
 ### Risk changes (severity increased/decreased)
 
@@ -226,20 +227,20 @@ Evidence checklist:
 - Finding: Emergency workflow transitions do not show complete durable audit coverage evidence.
 - Root cause: Emergency state changes are page-driven and not consistently routed through audited service methods.
 - Planned fix: Centralized audited emergency transition service and validation tests.
-- Current state: Blocked.
-- Pull request: Not Started.
-- Tests: Not Started.
-- Production build: Not Started.
-- Updated documentation: Not Started.
+- Current state: In Progress.
+- Pull request: Complete (commit 2a523c2).
+- Tests: Complete (npm run test:run, 33/33 passed).
+- Production build: Complete (npm run build passed).
+- Updated documentation: Complete.
 
 Evidence checklist:
 
-- [ ] Root cause documented
-- [ ] Fix implemented
-- [ ] Unit tests complete
-- [ ] Integration tests complete
-- [ ] Production build complete
-- [ ] Documentation updated
+- [x] Root cause documented
+- [x] Fix implemented
+- [x] Unit tests complete
+- [x] Integration tests complete
+- [x] Production build complete
+- [x] Documentation updated
 - [ ] Verification complete
 - [ ] Finding complete
 
