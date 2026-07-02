@@ -1,0 +1,52 @@
+# Security Findings Register
+
+Related remediation planning document: [SecurityRemediationPlan.md](SecurityRemediationPlan.md)
+
+Status vocabulary source: [../StatusVocabulary.md](../StatusVocabulary.md)
+
+Status legend:
+
+- Blocked: Not remediated and currently blocked from closure.
+- In Progress: Remediation in flight.
+- Complete: Remediation merged and validated.
+- Not Applicable: Explicitly postponed with documented risk acceptance.
+
+| ID | Severity | Finding | Owner | Status | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| SEC-001 | High | Multiple mutation paths update by id without explicit platform_id guard at call site. | Security + Backend | Blocked | [lib/dispatchService.ts](../../lib/dispatchService.ts), [app/trips/[id]/page.tsx](../../app/trips/[id]/page.tsx), [app/driver/page.tsx](../../app/driver/page.tsx), [app/emergency-dashboard/page.tsx](../../app/emergency-dashboard/page.tsx) |
+| SEC-002 | High | Privileged API routes create users with service-role key and no explicit caller authorization gate in route handlers. | Security + API | In Progress | [app/api/create-platform-admin/route.ts](../../app/api/create-platform-admin/route.ts), [app/api/create-driver-user/route.ts](../../app/api/create-driver-user/route.ts), [app/app/api/create-agent-user/route.ts](../../app/app/api/create-agent-user/route.ts), [lib/security/privilegedRouteGuard.ts](../../lib/security/privilegedRouteGuard.ts), [tests/unit/privileged-route-guard.test.ts](../../tests/unit/privileged-route-guard.test.ts) |
+| SEC-003 | High | RLS policy evidence is absent from repository SQL artifacts for tenant-sensitive tables. | Security + Data | Blocked | [docs/security/RLSVerification.md](RLSVerification.md) |
+| SEC-004 | Medium | Emergency workflow state transitions are not evidenced with explicit audit-log writes in reviewed page mutation path. | Security + Operations | Blocked | [app/emergency-dashboard/page.tsx](../../app/emergency-dashboard/page.tsx), [lib/auditService.ts](../../lib/auditService.ts) |
+| SEC-005 | Medium | Super-admin platform creation path lacks explicit in-path role/capability check evidence in reviewed client flow. | Security + Platform | Blocked | [app/super-admin/page.tsx](../../app/super-admin/page.tsx), [lib/security/permissionEngine.ts](../../lib/security/permissionEngine.ts) |
+| SEC-006 | Medium | Audit and trip-event tables allow nullable platform_id, reducing strict tenant attribution guarantees for critical records. | Security + Data | Blocked | [supabase/sql/create_audit_logs.sql](../../supabase/sql/create_audit_logs.sql), [supabase/sql/create_trip_events.sql](../../supabase/sql/create_trip_events.sql) |
+| SEC-007 | Low | Reports and emergency dashboards use a hardcoded platform identifier, which is brittle and risks inconsistent tenant context handling. | Security + Frontend | Blocked | [app/reports/page.tsx](../../app/reports/page.tsx), [app/emergency-dashboard/page.tsx](../../app/emergency-dashboard/page.tsx) |
+
+## Remediation Protocol
+
+For each finding:
+
+1. Create a focused remediation change.
+2. Add or update tests to prove control behavior.
+3. Run production build.
+4. Mark finding status and attach evidence references.
+
+## Phase 1 Execution Evidence (High Findings)
+
+| Finding | Remediation Implemented | Commit or PR | Unit Test Result | Integration Test Result | Production Build Result | Verification Reviewer | Closure Decision |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SEC-001 | Not Started | Not Started | Not Started | Not Started | Complete (baseline build pass) | Not Started | Not Started |
+| SEC-002 | Complete (route-level authorization guards implemented) | Complete (commit d164142) | Complete (npm run test:run, 23/23 tests) | Complete (integration suite included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
+| SEC-003 | Not Started | Not Started | Not Started | Not Started | Complete (baseline build pass) | Not Started | Not Started |
+| SEC-004 | Not Started | Not Started | Not Started | Not Started | Complete (baseline build pass) | Not Started | Not Started |
+
+Closure contract:
+
+1. A finding moves to Complete only when all evidence fields are Complete.
+2. Reviewer verification must be completed before closure.
+3. Closure decision must be explicitly recorded in this table and in [SecurityRemediationPlan.md](SecurityRemediationPlan.md).
+
+## Workstream Completion Criteria Mapping
+
+1. No cross-tenant data exposure: requires SEC-001, SEC-003, SEC-006 closure.
+2. Privileged actions require roles: requires SEC-002, SEC-005 closure.
+3. Audit coverage for critical workflows: requires SEC-004 closure.
