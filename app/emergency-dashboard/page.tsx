@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import EmergencyCard from "../../components/emergency/EmergencyCard";
 import { supabase } from "../../lib/supabase";
+import { transitionEmergencyAlert } from "../../lib/emergencyTransitionService";
 
 const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
 
@@ -44,17 +45,13 @@ export default function EmergencyDashboardPage() {
   }
 
   async function acknowledgeAlert(id: string) {
-    const { error } = await supabase
-      .from("emergency_alerts")
-      .update({
-        status: "Acknowledged",
-        acknowledged_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("platform_id", PLATFORM_ID);
-
-    if (error) {
-      alert(error.message);
+    try {
+      await transitionEmergencyAlert("acknowledge", {
+        alertId: id,
+        platformId: PLATFORM_ID,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to acknowledge alert");
       return;
     }
 
@@ -69,17 +66,14 @@ export default function EmergencyDashboardPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from("emergency_alerts")
-      .update({
-        status: "Response Assigned",
-        assigned_agent: assignedAgent,
-      })
-      .eq("id", id)
-      .eq("platform_id", PLATFORM_ID);
-
-    if (error) {
-      alert(error.message);
+    try {
+      await transitionEmergencyAlert("assign", {
+        alertId: id,
+        platformId: PLATFORM_ID,
+        assignedAgent,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to assign responder");
       return;
     }
 
@@ -95,18 +89,14 @@ export default function EmergencyDashboardPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from("emergency_alerts")
-      .update({
-        status: "Resolved",
-        resolution_notes: resolutionNotes,
-        resolved_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("platform_id", PLATFORM_ID);
-
-    if (error) {
-      alert(error.message);
+    try {
+      await transitionEmergencyAlert("resolve", {
+        alertId: id,
+        platformId: PLATFORM_ID,
+        resolutionNotes,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to resolve alert");
       return;
     }
 
