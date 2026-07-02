@@ -13,7 +13,7 @@ Status legend:
 
 | ID | Severity | Finding | Owner | Status | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| SEC-001 | High | Multiple mutation paths update by id without explicit platform_id guard at call site. | Security + Backend | Blocked | [lib/dispatchService.ts](../../lib/dispatchService.ts), [app/trips/[id]/page.tsx](../../app/trips/[id]/page.tsx), [app/driver/page.tsx](../../app/driver/page.tsx), [app/emergency-dashboard/page.tsx](../../app/emergency-dashboard/page.tsx) |
+| SEC-001 | High | Multiple mutation paths update by id without explicit platform_id guard at call site. | Security + Backend | In Progress | [lib/dispatchService.ts](../../lib/dispatchService.ts), [lib/security/tenantScope.ts](../../lib/security/tenantScope.ts), [app/trips/[id]/page.tsx](../../app/trips/[id]/page.tsx), [app/driver/page.tsx](../../app/driver/page.tsx), [app/emergency-dashboard/page.tsx](../../app/emergency-dashboard/page.tsx), [tests/unit/dispatch-scope.test.ts](../../tests/unit/dispatch-scope.test.ts) |
 | SEC-002 | High | Privileged API routes create users with service-role key and no explicit caller authorization gate in route handlers. | Security + API | In Progress | [app/api/create-platform-admin/route.ts](../../app/api/create-platform-admin/route.ts), [app/api/create-driver-user/route.ts](../../app/api/create-driver-user/route.ts), [app/app/api/create-agent-user/route.ts](../../app/app/api/create-agent-user/route.ts), [lib/security/privilegedRouteGuard.ts](../../lib/security/privilegedRouteGuard.ts), [tests/unit/privileged-route-guard.test.ts](../../tests/unit/privileged-route-guard.test.ts) |
 | SEC-003 | High | RLS policy evidence is absent from repository SQL artifacts for tenant-sensitive tables. | Security + Data | Blocked | [docs/security/RLSVerification.md](RLSVerification.md) |
 | SEC-004 | Medium | Emergency workflow state transitions are not evidenced with explicit audit-log writes in reviewed page mutation path. | Security + Operations | Blocked | [app/emergency-dashboard/page.tsx](../../app/emergency-dashboard/page.tsx), [lib/auditService.ts](../../lib/auditService.ts) |
@@ -34,8 +34,8 @@ For each finding:
 
 | Finding | Remediation Implemented | Commit or PR | Unit Test Result | Integration Test Result | Production Build Result | Verification Reviewer | Closure Decision |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SEC-001 | Not Started | Not Started | Not Started | Not Started | Complete (baseline build pass) | Not Started | Not Started |
-| SEC-002 | Complete (route-level authorization guards implemented) | Complete (commit d164142) | Complete (npm run test:run, 23/23 tests) | Complete (integration suite included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
+| SEC-001 | Complete (platform-scoped mutation guards implemented) | Complete (commit 2e50857) | Complete (npm run test:run, 25/25 tests) | Complete (integration suite included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
+| SEC-002 | Complete (route-level authorization guards implemented) | Complete (commit d164142) | Complete (npm run test:run, 25/25 tests) | Complete (integration suite included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
 | SEC-003 | Not Started | Not Started | Not Started | Not Started | Complete (baseline build pass) | Not Started | Not Started |
 | SEC-004 | Not Started | Not Started | Not Started | Not Started | Complete (baseline build pass) | Not Started | Not Started |
 

@@ -12,7 +12,7 @@ This document is a release-governance artifact, not only a remediation tracker. 
 | --- | --- |
 | Total Findings | 7 |
 | Critical Blocked | 0 |
-| High Blocked | 3 |
+| High Blocked | 1 |
 | Medium Blocked | 3 |
 | Low Blocked | 1 |
 | Overall Security Status | In Progress |
@@ -77,8 +77,8 @@ Scope:
 
 | Finding | Remediation Implemented | Commit or PR Reference | Unit Test Evidence | Integration Test Evidence | Production Build Result | Verification Reviewer | Closure Decision |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SEC-001 | Not Started | Not Started | Not Started | Not Started | Complete (latest build pass) | Not Started | Not Started |
-| SEC-002 | Complete (route-level authorization guards implemented) | Complete (commit d164142) | Complete (npm run test:run, 23/23 tests) | Complete (integration suite included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
+| SEC-001 | Complete (platform-scoped mutation guards implemented) | Complete (commit 2e50857) | Complete (npm run test:run, 25/25 tests) | Complete (integration suite included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
+| SEC-002 | Complete (route-level authorization guards implemented) | Complete (commit d164142) | Complete (npm run test:run, 25/25 tests) | Complete (integration suite included in npm run test:run) | Complete (npm run build) | Not Started (independent review pending) | In Progress |
 | SEC-003 | Not Started | Not Started | Not Started | Not Started | Complete (latest build pass) | Not Started | Not Started |
 | SEC-004 | Not Started | Not Started | Not Started | Not Started | Complete (latest build pass) | Not Started | Not Started |
 
@@ -141,7 +141,8 @@ Execution sequence per finding:
 
 ### In Progress findings (execution evidence updated this week)
 
-- SEC-002: Route-level caller authorization and platform assignment guards implemented for privileged user-creation endpoints. Awaiting reviewer approval and commit or PR reference for closure.
+- SEC-001: Platform-scoped mutation guards implemented in shared and page-level trip workflows. Awaiting reviewer approval for closure.
+- SEC-002: Route-level caller authorization and platform assignment guards implemented for privileged user-creation endpoints. Awaiting independent reviewer approval for closure.
 
 ### Risk changes (severity increased/decreased)
 
@@ -158,20 +159,20 @@ Execution sequence per finding:
 - Finding: Mutation paths update by id without consistent tenant guard evidence.
 - Root cause: Tenant-aware write controls are not consistently centralized in shared services.
 - Planned fix: Tenant-scoped service wrappers plus id + platform guard enforcement.
-- Current state: Blocked.
-- Pull request: Not Started.
-- Tests: Not Started.
-- Production build: Not Started.
-- Updated documentation: Not Started.
+- Current state: In Progress.
+- Pull request: Complete (commit 2e50857).
+- Tests: Complete (npm run test:run, 25/25 passed).
+- Production build: Complete (npm run build passed).
+- Updated documentation: Complete.
 
 Evidence checklist:
 
-- [ ] Root cause documented
-- [ ] Fix implemented
-- [ ] Unit tests complete
-- [ ] Integration tests complete
-- [ ] Production build complete
-- [ ] Documentation updated
+- [x] Root cause documented
+- [x] Fix implemented
+- [x] Unit tests complete
+- [x] Integration tests complete
+- [x] Production build complete
+- [x] Documentation updated
 - [ ] Verification complete
 - [ ] Finding complete
 
@@ -182,7 +183,7 @@ Evidence checklist:
 - Planned fix: Authenticated caller checks and centralized authorization middleware/guard.
 - Current state: In Progress.
 - Pull request: Complete (commit d164142).
-- Tests: Complete (npm run test:run, 23/23 passed).
+- Tests: Complete (npm run test:run, 25/25 passed).
 - Production build: Complete (npm run build passed).
 - Updated documentation: Complete.
 
@@ -396,7 +397,7 @@ Gate transition rule:
 | Severity | Blocked | Complete | Launch Blocker |
 | --- | --- | --- | --- |
 | Critical | 0 | 0 | Yes |
-| High | 3 | 0 | Yes |
+| High | 1 | 0 | Yes |
 | Medium | 3 | 0 | No |
 | Low | 1 | 0 | No |
 
