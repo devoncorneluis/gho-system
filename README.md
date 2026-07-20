@@ -1,5 +1,21 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+GHO is a multi-tenant transport operations platform with dispatch, fleet, driver, operations, analytics, intelligence, automation, and platform governance modules.
+
+## Documentation
+
+Use these guides as the primary entry points for architecture, operations, release readiness, and deployment.
+
+- [docs/README.md](docs/README.md)
+- [docs/Architecture.md](docs/Architecture.md)
+- [docs/ROADMAP.md](docs/ROADMAP.md)
+- [docs/ReadinessChecklist.md](docs/ReadinessChecklist.md)
+- [docs/V1_PRODUCTION_READINESS_PROGRAM.md](docs/V1_PRODUCTION_READINESS_PROGRAM.md)
+- [docs/OPERATIONS_READINESS_RUNBOOKS.md](docs/OPERATIONS_READINESS_RUNBOOKS.md)
+- [docs/RELEASE_BRANCHING_STRATEGY.md](docs/RELEASE_BRANCHING_STRATEGY.md)
+- [docs/Deployment.md](docs/Deployment.md)
+- [docs/OperationsGuide.md](docs/OperationsGuide.md)
+
 ## Getting Started
 
 First, run the development server:

@@ -21,7 +21,7 @@ export default function ProfilePage() {
 
   async function loadProfile() {
     const { data, error } = await supabase
-      .from("admin_profiles")
+.from("user_profiles")
       .select("*")
       .eq("platform_id", PLATFORM_ID)
       .limit(1)

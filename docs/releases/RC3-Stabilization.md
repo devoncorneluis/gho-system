@@ -90,6 +90,18 @@ Status vocabulary source: [../StatusVocabulary.md](../StatusVocabulary.md)
 | Backup and Recovery | Not Started |
 | Release Approval | Not Started |
 
+## Current Release Board Status
+
+| Gate | Status |
+| --- | --- |
+| Architecture | Complete |
+| Governance | Complete |
+| Security | Awaiting final sign-off |
+| UAT | Execution Started |
+| Performance | Pending |
+| Disaster Recovery | Pending |
+| Go / No-Go | Pending |
+
 ## Gate 1 Closure Record
 
 | Field | Value |

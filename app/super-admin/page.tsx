@@ -1,18 +1,19 @@
 "use client";
-
+import PlatformCards from "../../components/super-admin/PlatformCards";
+import ExecutiveKpiCards from "../../components/super-admin/ExecutiveKpiCards";
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
-
+import LiveOperationsPanel from "../../components/super-admin/LiveOperationsPanel";
 type Platform = {
   id: string;
   name: string;
-  company_name: string | null;
+  company_code: string | null;
   contact_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
-  package_name: string | null;
-  status: string | null;
+  billing_cycle_days: number | null;
+  active: boolean;
   created_at: string | null;
 };
 
@@ -42,7 +43,15 @@ export default function SuperAdminPage() {
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPasswordNote, setAdminPasswordNote] = useState("");
-
+const [dashboard, setDashboard] = useState({
+  activeTrips: 0,
+  completedTrips: 0,
+  onlineDrivers: 0,
+  activeVehicles: 0,
+  pendingBilling: 0,
+  pendingPayroll: 0,
+  emergencies: 0,
+});
   async function loadPlatforms() {
     const { data, error } = await supabase
       .from("platforms")
@@ -53,7 +62,7 @@ export default function SuperAdminPage() {
       alert(error.message);
       return;
     }
-
+console.log("Platforms from Supabase:", data);
     setPlatforms(data || []);
   }
 
@@ -77,15 +86,19 @@ export default function SuperAdminPage() {
       alert("Platform name, company name, and contact email are required.");
       return;
     }
+const {
+  data: { user },
+} = await supabase.auth.getUser();
 
+console.log("Logged in user:", user);
     const { error } = await supabase.from("platforms").insert({
       name: platformName,
-      company_name: companyName,
+company_code: companyName,
       contact_name: contactName,
       contact_email: contactEmail,
       contact_phone: contactPhone,
-      package_name: packageName,
-      status: "Active",
+billing_cycle_days: 14,
+active: true,
     });
 
     if (error) {
@@ -104,26 +117,39 @@ export default function SuperAdminPage() {
   }
 
 async function createPlatformAdmin() {
-  if (!adminPlatformId || !adminName || !adminEmail) {
-    alert("Platform, admin name, and admin email are required.");
-    return;
-  }
+console.log({
+  adminPlatformId,
+  adminName,
+  adminEmail,
+});
+
+if (!adminPlatformId || !adminName || !adminEmail) {
+  alert(
+    `Platform ID: ${adminPlatformId}\nName: ${adminName}\nEmail: ${adminEmail}`
+  );
+  return;
+}
 
   const temporaryPassword =
     adminPasswordNote || "Admin123!";
 
-  const response = await fetch("/api/create-platform-admin", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email: adminEmail,
-      password: temporaryPassword,
-      full_name: adminName,
-      platform_id: adminPlatformId,
-    }),
-  });
+const {
+  data: { session },
+} = await supabase.auth.getSession();
+
+const response = await fetch("/api/create-platform-admin", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${session?.access_token}`,
+  },
+  body: JSON.stringify({
+    email: adminEmail,
+    password: temporaryPassword,
+    full_name: adminName,
+    platform_id: adminPlatformId,
+  }),
+});
 
   const result = await response.json();
 
@@ -143,20 +169,82 @@ async function createPlatformAdmin() {
 
   loadPlatformAdmins();
 }
+async function loadDashboard() {
 
-  useEffect(() => {
-    loadPlatforms();
-    loadPlatformAdmins();
-  }, []);
+  const [
+    trips,
+    drivers,
+    vehicles,
+    billing,
+    payroll,
+    emergencies,
+  ] = await Promise.all([
+    supabase.from("trips").select("id,status"),
+    supabase.from("drivers").select("id,availability_status"),
+    supabase.from("vehicles").select("id,status"),
+    supabase.from("billing_records").select("id,billing_status"),
+    supabase.from("driver_payroll").select("id,payroll_status"),
+    supabase.from("emergency_alerts").select("id,status"),
+  ]);
 
+  setDashboard({
+    activeTrips:
+      trips.data?.filter(
+        (t) =>
+          t.status === "started" ||
+          t.status === "en_route"
+      ).length ?? 0,
+
+    completedTrips:
+      trips.data?.filter(
+        (t) => t.status === "completed"
+      ).length ?? 0,
+
+    onlineDrivers:
+      drivers.data?.filter(
+        (d) => d.availability_status === "Online"
+      ).length ?? 0,
+
+    activeVehicles:
+      vehicles.data?.filter(
+        (v) => v.status === "Active"
+      ).length ?? 0,
+
+    pendingBilling:
+      billing.data?.filter(
+        (b) => b.billing_status === "pending"
+      ).length ?? 0,
+
+    pendingPayroll:
+      payroll.data?.filter(
+        (p) => p.payroll_status === "pending"
+      ).length ?? 0,
+
+    emergencies:
+      emergencies.data?.filter(
+        (e) => e.status === "active"
+      ).length ?? 0,
+  });
+}
+useEffect(() => {
+  loadPlatforms();
+  loadDashboard();
+}, []);
   return (
     <AdminLayout>
       <main className="min-h-screen bg-gray-100 p-6">
         <h1 className="text-4xl font-bold text-[#061B33]">
           Super Admin Portal
         </h1>
+<ExecutiveKpiCards dashboard={dashboard} />
 
-        <p className="text-gray-600 mt-2">
+<LiveOperationsPanel
+  activeTrips={dashboard.activeTrips}
+  onlineDrivers={dashboard.onlineDrivers}
+  emergencies={dashboard.emergencies}
+/>
+
+<p className="text-gray-600 mt-2">
           Create and manage client platforms for Corneluis Group Pty Ltd.
         </p>
 
@@ -186,14 +274,22 @@ async function createPlatformAdmin() {
           <h2 className="text-xl font-bold mb-4">Create Platform Admin</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <select value={adminPlatformId} onChange={(e) => setAdminPlatformId(e.target.value)} className="border p-3 rounded-lg">
-              <option value="">Select Platform</option>
-              {platforms.map((platform) => (
-                <option key={platform.id} value={platform.id}>
-                  {platform.name} - {platform.company_name}
-                </option>
-              ))}
-            </select>
+<select
+  value={adminPlatformId}
+  onChange={(e) => {
+    console.log("Selected Platform:", e.target.value);
+    setAdminPlatformId(e.target.value);
+  }}
+  className="border p-3 rounded-lg"
+>
+  <option value="">Select Platform</option>
+
+  {platforms.map((platform) => (
+    <option key={platform.id} value={platform.id}>
+      {platform.name} ({platform.id})
+    </option>
+  ))}
+</select>
 
             <input value={adminName} onChange={(e) => setAdminName(e.target.value)} className="border p-3 rounded-lg" placeholder="Admin Full Name" />
             <input value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} className="border p-3 rounded-lg" placeholder="Admin Email" />
@@ -218,12 +314,15 @@ async function createPlatformAdmin() {
                 <p className="text-xl font-bold text-[#061B33]">
                   {platform.name}
                 </p>
-                <p><strong>Company:</strong> {platform.company_name}</p>
+<p><strong>Company Code:</strong> {platform.company_code}</p>
                 <p><strong>Contact:</strong> {platform.contact_name}</p>
                 <p><strong>Email:</strong> {platform.contact_email}</p>
                 <p><strong>Phone:</strong> {platform.contact_phone}</p>
-                <p><strong>Package:</strong> {platform.package_name}</p>
-                <p><strong>Status:</strong> {platform.status}</p>
+<p><strong>Billing Cycle:</strong> {platform.billing_cycle_days} days</p>
+<p>
+  <strong>Status:</strong>{" "}
+  {platform.active ? "Active" : "Inactive"}
+</p>
                 <p className="text-xs text-gray-500 mt-2">
                   Platform ID: {platform.id}
                 </p>
@@ -231,36 +330,58 @@ async function createPlatformAdmin() {
             ))}
           </div>
         </div>
+<div className="bg-white rounded-xl shadow p-6 mt-6">
+  <h2 className="text-xl font-bold mb-4">Platform Admins</h2>
 
-        <div className="bg-white rounded-xl shadow p-6 mt-6">
-          <h2 className="text-xl font-bold mb-4">Platform Admins</h2>
+  {platformAdmins.length === 0 && (
+    <p className="text-gray-500">
+      No platform admins created yet.
+    </p>
+  )}
 
-          {platformAdmins.length === 0 && (
-            <p className="text-gray-500">No platform admins created yet.</p>
-          )}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {platformAdmins.map((admin) => {
+      const platform = platforms.find(
+        (item) => item.id === admin.platform_id
+      );
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {platformAdmins.map((admin) => {
-              const platform = platforms.find(
-                (item) => item.id === admin.platform_id
-              );
+      return (
+        <div
+          key={admin.id}
+          className="border rounded-xl p-5"
+        >
+          <p className="text-xl font-bold text-[#061B33]">
+            {admin.full_name}
+          </p>
 
-              return (
-                <div key={admin.id} className="border rounded-xl p-5">
-                  <p className="text-xl font-bold text-[#061B33]">
-                    {admin.full_name}
-                  </p>
-                  <p><strong>Email:</strong> {admin.email}</p>
-                  <p><strong>Role:</strong> {admin.role}</p>
-                  <p><strong>Status:</strong> {admin.status}</p>
-                  <p><strong>Platform:</strong> {platform?.name || admin.platform_id}</p>
-                  <p><strong>Password Note:</strong> {admin.password_note || "None"}</p>
-                </div>
-              );
-            })}
-          </div>
+          <p>
+            <strong>Email:</strong> {admin.email}
+          </p>
+
+          <p>
+            <strong>Role:</strong> {admin.role}
+          </p>
+
+          <p>
+            <strong>Status:</strong> {admin.status}
+          </p>
+
+          <p>
+            <strong>Platform:</strong>{" "}
+            {platform?.name || admin.platform_id}
+          </p>
+
+          <p>
+            <strong>Password Note:</strong>{" "}
+            {admin.password_note || "None"}
+          </p>
         </div>
+      );
+    })}
+  </div>
+</div>
+
       </main>
     </AdminLayout>
   );
-}
+  }

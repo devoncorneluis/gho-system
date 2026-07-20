@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
+import FleetMap from "../../components/maps/FleetMap";
 import { supabase } from "../../lib/supabase";
 
 type Activity = {  id: string;  title: string;  created_at: string;};
-type FleetDriver = {  driver_id: string;  driver_name: string;  trip_code: string | null;  vehicle_name: string | null;  speed: number | null;  is_tracking: boolean;  updated_at: string;};
+type FleetDriver = {  driver_id: string;  driver_name: string;  trip_code: string | null;  vehicle_name: string | null;  speed: number | null;  is_tracking: boolean;  updated_at: string;  driver_response?: string | null;  driver_response_at?: string | null;  dispatched_at?: string | null;  dispatched_by?: string | null;};
+type LiveDriver = {  driver_id: string;  driver_name?: string;  trip_id: string | null;  latitude: number;  longitude: number;  speed: number | null;  heading: number | null;  accuracy: number | null;  is_tracking: boolean;  updated_at: string;};
 
 export default function LiveDispatchPage() {
   const [driversOnline, setDriversOnline] = useState(0);
@@ -13,6 +15,36 @@ export default function LiveDispatchPage() {
   const [availableVehicles, setAvailableVehicles] = useState(0);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [fleet, setFleet] = useState<FleetDriver[]>([]);
+  const [liveDrivers, setLiveDrivers] = useState<LiveDriver[]>([]);
+  const demoRoute = [
+    { lat: -33.9249, lng: 18.4241 },
+    { lat: -33.915, lng: 18.45 },
+    { lat: -33.905, lng: 18.47 },
+  ];
+  const demoPickups = [
+    {
+      id: "1",
+      full_name: "Devon",
+      latitude: -33.923,
+      longitude: 18.422,
+      pickup_status: "Waiting",
+    },
+    {
+      id: "2",
+      full_name: "Sarah",
+      latitude: -33.918,
+      longitude: 18.438,
+      pickup_status: "Picked Up",
+    },
+  ];
+
+  const demoEmergencies = [
+    {
+      id: "1",
+      latitude: -33.921,
+      longitude: 18.431,
+    },
+  ];
 
   async function loadDashboard() {
     const { count: online } = await supabase
@@ -31,10 +63,9 @@ export default function LiveDispatchPage() {
       .eq("status", "Active");
 
     const { count: vehicles } = await supabase
-      .from("vehicles")
-      .select("*", { count: "exact", head: true })
-      .eq("availability_status", "Available");
-
+.from("vehicles")
+.select("*", { count: "exact", head: true })
+.eq("status", "Available");
     setDriversOnline(online ?? 0);
     setActiveTrips(trips ?? 0);
     setEmergencies(emergency ?? 0);
@@ -43,16 +74,20 @@ export default function LiveDispatchPage() {
 
   async function loadActivities() {  const { data, error } = await supabase    .from("notification_logs")    .select("id, title, created_at")    .order("created_at", { ascending: false })    .limit(10);  if (error) {    console.error(error.message);    return;  }  setActivities(data || []);}
 
-  async function loadFleet() {  const { data, error } = await supabase    .from("driver_locations")    .select(`      driver_id,      speed,      updated_at,      is_tracking,      drivers(full_name),      trips(trip_code),      vehicles(vehicle_name)    `);  if (error) {    console.error(error.message);    return;  }  setFleet(    (data || []).map((item: any) => ({      driver_id: item.driver_id,      driver_name: item.drivers?.full_name ?? "Unknown",      trip_code: item.trips?.trip_code ?? "-",      vehicle_name: item.vehicles?.vehicle_name ?? "-",      speed: item.speed,      is_tracking: item.is_tracking,      updated_at: item.updated_at,    }))  );}
+  async function loadFleet() {  const { data, error } = await supabase    .from("driver_locations")    .select(`      driver_id,      speed,      updated_at,      is_tracking,      drivers(full_name),      trips(trip_code, driver_response, driver_response_at, dispatched_at, dispatched_by),      vehicles(vehicle_name)    `);  if (error) {    console.error(error.message);    return;  }  setFleet(    (data || []).map((item: any) => ({      driver_id: item.driver_id,      driver_name: item.drivers?.full_name ?? "Unknown",      trip_code: item.trips?.trip_code ?? "-",      vehicle_name: item.vehicles?.vehicle_name ?? "-",      speed: item.speed,      is_tracking: item.is_tracking,      updated_at: item.updated_at,      driver_response: item.trips?.driver_response ?? null,      driver_response_at: item.trips?.driver_response_at ?? null,      dispatched_at: item.trips?.dispatched_at ?? null,      dispatched_by: item.trips?.dispatched_by ?? null,    }))  );}
+
+  async function loadLiveDrivers() {  const { data, error } = await supabase    .from("driver_locations")    .select(`      driver_id,      trip_id,      latitude,      longitude,      speed,      heading,      accuracy,      is_tracking,      updated_at,      drivers(full_name)    `)    .eq("is_tracking", true);  if (error) {    console.error(error.message);    return;  }  setLiveDrivers(    (data || []).map((item: any) => ({      ...item,      driver_name: item.drivers?.full_name ?? "Unknown Driver",    }))  );}
 
   useEffect(() => {
     loadDashboard();
     loadActivities();
     loadFleet();
+    loadLiveDrivers();
     const interval = setInterval(() => {
       loadDashboard();
       loadActivities();
       loadFleet();
+      loadLiveDrivers();
     }, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -68,16 +103,13 @@ export default function LiveDispatchPage() {
         <div className="mt-6 rounded-2xl bg-white p-6 shadow">
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2 rounded-xl border bg-gray-50 p-6">
-              <div className="flex h-[600px] items-center justify-center rounded-lg border-2 border-dashed border-gray-300">
-                <div className="text-center">
-                  <p className="text-5xl">🗺️</p>
-                  <h2 className="mt-4 text-2xl font-bold text-[#061B33]">
-                    Live Fleet Map
-                  </h2>
-                  <p className="mt-2 text-gray-500">
-                    Google Maps will appear here.
-                  </p>
-                </div>
+              <div className="h-[650px]">
+                <FleetMap
+                  drivers={liveDrivers}
+                  pickups={demoPickups}
+                  route={demoRoute}
+                  emergencies={demoEmergencies}
+                />
               </div>
             </div>
 

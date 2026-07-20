@@ -5,7 +5,8 @@ import { supabase } from "../lib/supabase";
 
 const links = [
   { name: "🏠 Dashboard", href: "/admin" },
-{ name: "🚐 Daily Planner", href: "/admin-planner" },
+  { name: "🚐 Daily Planner", href: "/admin-planner" },
+  { name: "🚦 Dispatch", href: "/dispatch-command" },
   { name: "🚐 Trips", href: "/trips" },
   { name: "👥 Agents", href: "/agents" },
   { name: "🚗 Drivers", href: "/drivers" },
@@ -17,7 +18,11 @@ const links = [
   { name: "👤 Profile", href: "/profile" },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const router = useRouter();
 
   async function logout() {

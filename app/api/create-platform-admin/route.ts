@@ -42,15 +42,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { error: profileError } =
-      await supabaseAdmin.from("user_profiles").insert({
-        user_id: authData.user.id,
-        platform_id,
-        full_name,
-        email,
-        role: "admin",
-        status: "Active",
-      });
+const { error: profileError } =
+  await supabaseAdmin.from("user_profiles").insert({
+    id: authData.user.id,
+    platform_id,
+    full_name,
+    email,
+    role: "admin",
+    active: true,
+  });
 
     if (profileError) {
       return NextResponse.json(

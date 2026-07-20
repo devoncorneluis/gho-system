@@ -37,6 +37,46 @@ Run notes:
 2. This run provides objective Gate 2 execution evidence for environment and route-level workflow reachability.
 3. Credentialed end-to-end workflow completion is still required for final UAT closure.
 
+## Current Gate 2 Role Progress
+
+This table records business workflow execution progress. Route reachability evidence from Run 1 does not mark a role complete.
+
+| Workflow Role | Business Workflow Status | Evidence State | Next Required Execution |
+| --- | --- | --- | --- |
+| Super Admin | In Progress | Route shell reached; credentialed create/configure workflows pending | Login, create platform, create platform admin, view release dashboard, view monitoring, logout |
+| Platform Admin | Not Started | Requires seeded platform-admin account and tenant data | Login, import/create agents, create driver, create vehicle, create trip, dispatch trip, view operations, logout |
+| Dispatcher | Not Started | Requires credentialed dispatcher session and dispatch queue data | Monitor dispatch queue, reassign driver, resolve exceptions, observe realtime updates |
+| Driver | Not Started | Requires credentialed driver account and assigned trip data | Login, view assigned trip, accept, reject negative test, navigate, complete trip, emergency button |
+| Client | In Progress | Client dashboard route reached; scoped tracking/report validation pending | Login, view active transport, track employee, view reports |
+| Executive | In Progress | Executive KPI shell reached; KPI data-quality validation pending | KPI dashboards, analytics, release dashboard visibility if intended, monitoring summaries |
+
+Overall:
+
+1. 3 / 6 Started
+2. 0 / 6 Complete
+
+## Execution Sprint 1 Attempt (2026-07-06)
+
+Execution type: Deterministic UAT reset and seeded workflow execution attempt.
+
+| Field | Value |
+| --- | --- |
+| Tester | Codex |
+| Date | 2026-07-06 |
+| Environment | Local workspace with Supabase API credentials present |
+| Preconditions | `node --experimental-strip-types scripts/reset-uat.ts` requires `DATABASE_URL` or `SUPABASE_DB_URL` and `psql` |
+| Expected Result | Reset UAT demo data, seed deterministic dataset, execute all role workflows |
+| Actual Result | Reset did not start. `DATABASE_URL` / `SUPABASE_DB_URL` was missing and `psql` was not available on PATH. No UAT workflow evidence was generated. |
+| Pass/Fail | Blocked |
+| Evidence Reference | Terminal execution of `node --experimental-strip-types scripts/reset-uat.ts` |
+| Defects | Environment prerequisite gap; no application defect identified |
+
+Run notes:
+
+1. Supabase API credentials were present: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
+2. SQL execution prerequisites were missing: `DATABASE_URL` or `SUPABASE_DB_URL`, plus the `psql` client.
+3. No role status is advanced to Complete until the deterministic seed reset runs and workflows are executed with evidence.
+
 ## Super Admin Scripts
 
 ### Script SA-01: Create company

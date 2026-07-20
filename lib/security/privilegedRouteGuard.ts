@@ -71,12 +71,11 @@ export async function authorizePrivilegedRoute(
   }
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from("user_profiles")
-    .select("role, platform_id")
-    .or(`id.eq.${user.id},user_id.eq.${user.id}`)
-    .limit(1)
-    .maybeSingle();
+const { data: profile, error: profileError } = await supabaseAdmin
+  .from("user_profiles")
+  .select("role, platform_id")
+  .eq("id", user.id)
+  .maybeSingle();
 
   if (profileError || !profile?.role) {
     return { ok: false, status: 403, error: "Caller profile is missing role authorization." };

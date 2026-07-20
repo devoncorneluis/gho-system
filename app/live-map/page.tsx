@@ -40,8 +40,7 @@ export default function LiveMapPage() {
 
   const [locations, setLocations] = useState<DriverLocation[]>([]);
   const [emergencies, setEmergencies] = useState<EmergencyAlertPin[]>([]);
-  const [selectedEmergency, setSelectedEmergency] =
-    useState<EmergencyAlertPin | null>(null);
+  const [selectedEmergency, setSelectedEmergency] = useState<EmergencyAlertPin | null>(null);
 
   useEffect(() => {
     async function loadPlatform() {
@@ -57,14 +56,13 @@ export default function LiveMapPage() {
 
     loadPlatform();
   }, []);
-    useState<EmergencyAlertPin | null>(null);
+  // const [selectedEmergency, setSelectedEmergency] = useState<EmergencyAlertPin | null>(null);
 
   async function loadLocations() {
-    const { data, error } = await supabase
-      .from("driver_locations")
-      .select("*")
-.eq("platform_id", platformId)
-      .order("last_updated", { ascending: false });
+const { data, error } = await supabase
+  .from("driver_locations")
+  .select("*")
+  .order("updated_at", { ascending: false });
 
     if (error) {
       alert(error.message);
@@ -173,8 +171,15 @@ useEffect(() => {
                         lat: location.latitude,
                         lng: location.longitude,
                       }}
-                      label="🚐"
-                      title={location.driver_name || "Driver"}
+label={
+  location.status === "On Trip"
+    ? "🟢"
+    : location.status === "Available"
+    ? "🔵"
+    : "⚪"
+}
+title={`${location.driver_name || "Driver"}
+Status: ${location.status || "Unknown"}`}
                     />
                   );
                 })}

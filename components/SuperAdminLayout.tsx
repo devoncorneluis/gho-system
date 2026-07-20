@@ -65,6 +65,10 @@ export default function SuperAdminLayout({
             📈 Reports
           </Link>
 
+          <Link href="/release" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
+            🚀 Release Dashboard
+          </Link>
+
           <Link href="/super-admin/settings" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
             ⚙️ Settings
           </Link>

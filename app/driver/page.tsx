@@ -109,6 +109,7 @@ const [liveDrivers, setLiveDrivers] = useState<LiveDriver[]>([]);
       .select("*")
       .eq("platform_id", activePlatformId)
       .eq("driver_name", driverName)
+      .in("status", ["dispatched", "started"])
       .order("trip_date", { ascending: true });
 
     if (error) {
@@ -118,6 +119,24 @@ const [liveDrivers, setLiveDrivers] = useState<LiveDriver[]>([]);
 
     setTrips(data || []);
   }
+  async function respondToDispatch(
+  tripId: string,
+  response: "accepted" | "rejected"
+) {
+  const { error } = await supabase
+    .from("trips")
+    .update({
+      driver_response: response,
+    })
+    .eq("id", tripId);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadTrips(platformId, driver?.full_name || "");
+}
   async function loadLiveDrivers() {
   const { data, error } = await supabase
     .from("driver_locations")
@@ -270,25 +289,61 @@ async function stopGpsTracking() {
 }
 
 
-  async function updateTripStatus(tripId: string, status: string) {
-    if (!platformId) {
-      alert("Driver platform context is not loaded.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("trips")
-      .update({ status })
-      .eq("id", tripId)
-      .eq("platform_id", platformId);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setupDriver();
+async function updateTripStatus(
+  trip: Trip,
+  nextStatus: string
+) {
+  if (!platformId) {
+    alert("Platform not loaded.");
+    return;
   }
+
+  if (!trip.status) {
+    alert("Trip status missing.");
+    return;
+  }
+
+  try {
+await dispatchUpdateTripStatus(
+  trip.id,
+  trip.status,
+  nextStatus,
+  {
+    platformId,
+  }
+);
+
+if (nextStatus === TRIP_STATUS.COMPLETED && driver) {
+  try {
+    const { logAudit } = await import("../../lib/auditLog");
+    const { recordCompletedTrip } = await import("../../lib/billing");
+    const { recordDriverTrip } = await import("../../lib/payroll");
+
+    await logAudit(
+      "Trip Completed",
+      trip.id,
+      driver.full_name
+    );
+
+    await recordCompletedTrip(trip.id);
+
+    await recordDriverTrip(
+      driver.id,
+      trip.id,
+      trip.estimated_km ?? 0
+    );
+  } catch (err) {
+    console.error("Post-trip processing failed:", err);
+  }
+}
+
+setupDriver();
+  } catch (err: any) {
+    alert(err.message);
+  }
+}
+
+
 
   async function acceptTrip(trip: Trip) {
     if (!trip.status) {
@@ -352,6 +407,26 @@ async function stopGpsTracking() {
 
     if (platformId) {
       loadPassengers(platformId);
+      const tripPassengers = passengers.filter(
+  (p) => p.trip_id === selectedTripId
+);
+
+const pickedUp =
+  tripPassengers.filter(
+    (p) =>
+      p.id === passengerId
+        ? status === "Picked Up"
+        : p.pickup_status === "Picked Up"
+  ).length;
+
+if (
+  tripPassengers.length > 0 &&
+  pickedUp === tripPassengers.length
+) {
+  alert(
+    "✅ All passengers collected.\n\nYou can now complete this trip."
+  );
+}
     }
   }
 
@@ -382,7 +457,9 @@ async function stopGpsTracking() {
   }
 
   useEffect(() => {
+
     setupDriver();
+
   }, []);
 
   const driverName = driver?.full_name || "Driver";
@@ -393,6 +470,7 @@ async function stopGpsTracking() {
 
   const selectedTrip = activeTrips.find((trip) => trip.id === selectedTripId);
   const selectedPassengers = selectedTrip
+
     ? passengers.filter((passenger) => passenger.trip_id === selectedTrip.id)
     : [];
 
@@ -490,10 +568,13 @@ async function stopGpsTracking() {
                     <div className="grid grid-cols-2 gap-3 mt-5">
                       <div className="flex gap-2">
                         <button
-                          onClick={() => {
-                            setSelectedTripId(trip.id);
-                            updateTripStatus(trip.id, "In Progress");
-                          }}
+onClick={async () => {
+  setSelectedTripId(trip.id);
+  await updateTripStatus(
+    trip,
+TRIP_STATUS.EN_ROUTE
+  );
+}}
                           className="border rounded-xl px-3 py-3 font-bold"
                         >
                           Start Trip
@@ -689,7 +770,25 @@ async function stopGpsTracking() {
               </div>
 
               <button
-                onClick={() => updateTripStatus(selectedTrip.id, "Completed")}
+
+onClick={() => {
+  const waitingPassengers = selectedPassengers.filter(
+    (p) => p.pickup_status !== "Picked Up"
+  );
+
+  if (waitingPassengers.length > 0) {
+    alert(
+      `There are still ${waitingPassengers.length} passenger(s) waiting to be collected.`
+    );
+    return;
+  }
+
+  updateTripStatus(
+    selectedTrip,
+    TRIP_STATUS.COMPLETED
+  );
+}}
+
                 className="bg-[#061B33] text-white rounded-2xl p-4 font-bold w-full mt-6"
               >
                 Complete Trip

@@ -8,7 +8,7 @@ import TripCard from "../../components/trips/TripCard";
 import TripActions from "../../components/trips/TripActions";
 import PassengerManifest from "../../components/trips/PassengerManifest";
 import StatusBadge from "../../components/trips/StatusBadge";
-
+import { dispatchTrip } from "../../lib/dispatchService";
 
 
 type TripPassenger = {
@@ -495,7 +495,37 @@ export default function TripsPage() {
                     >
                       Save Driver & Vehicle
                     </button>
+<button
+  onClick={async () => {
+    if (!platformId) return;
 
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("User not logged in.");
+        return;
+      }
+
+      await dispatchTrip(
+        trip.id,
+        platformId,
+        user.id
+      );
+
+      alert("Trip dispatched successfully.");
+
+      loadTrips();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  }}
+  className="bg-orange-500 text-white px-5 py-3 rounded-lg font-bold"
+>
+  🚐 Dispatch Trip
+</button>
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         onClick={() => updateTrip(trip, "In Progress")}

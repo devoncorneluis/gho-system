@@ -95,12 +95,10 @@ export default function AgentTrackingPage() {
       return;
     }
 
-    const { data: locationData } = await supabase
-      .from("driver_locations")
-      .select("*")
-      .eq("platform_id", finalPlatformId)
-      .in("driver_name", driverNames)
-      .order("last_updated", { ascending: false });
+const { data: locationData } = await supabase
+  .from("driver_locations")
+  .select("*")
+  .order("updated_at", { ascending: false });
 
     setLocations(locationData || []);
     setTrips(tripData || []);

@@ -6,26 +6,28 @@ import { supabase } from "../../lib/supabase";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-async function forgotPassword() {
-  if (!email.trim()) {
-    alert("Enter your email address first.");
-    return;
-  }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(
-    email.trim(),
-    {
-      redirectTo: "http://localhost:3000/reset-password",
+  async function forgotPassword() {
+    if (!email.trim()) {
+      alert("Enter your email address first.");
+      return;
     }
-  );
 
-  if (error) {
-    alert(error.message);
-    return;
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+      {
+        redirectTo: "http://localhost:3000/reset-password",
+      }
+    );
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Password reset email sent.");
   }
 
-  alert("Password reset email sent.");
-}
   async function login() {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
@@ -37,37 +39,37 @@ async function forgotPassword() {
       return;
     }
 
-const { data: profile, error: profileError } = await supabase
-  .from("user_profiles")
-  .select("role")
-  .eq("id", data.user.id)
-  .single();
+    const { data: profile, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .single();
 
-console.log("PROFILE", profile);
-console.log("PROFILE ERROR", profileError);
-    const role = profile?.role;
-
-    if (role === "super_admin") {
-      window.location.href = "/super-admin";
+    if (profileError) {
+      alert(profileError.message);
       return;
     }
 
-    if (role === "admin") {
-      window.location.href = "/admin";
-      return;
-    }
+    switch (profile?.role) {
+      case "super_admin":
+        window.location.href = "/super-admin";
+        return;
 
-    if (role === "driver") {
-      window.location.href = "/driver";
-      return;
-    }
+      case "admin":
+        window.location.href = "/admin";
+        return;
 
-    if (role === "agent") {
-      window.location.href = "/agent-tracking";
-      return;
-    }
+      case "driver":
+        window.location.href = "/driver";
+        return;
 
-    alert("No profile role found for this user.");
+      case "agent":
+        window.location.href = "/agent-tracking";
+        return;
+
+      default:
+        alert("No profile role found for this user.");
+    }
   }
 
   return (
@@ -122,21 +124,22 @@ console.log("PROFILE ERROR", profileError);
             type="password"
             placeholder="Password"
           />
-<button
-  onClick={login}
-  className="w-full bg-black text-white font-bold p-4 rounded-2xl shadow-lg"
->
-  Login
-</button>
 
-<button
-  onClick={forgotPassword}
-  className="w-full mt-3 text-blue-600 font-semibold"
->
-  Forgot Password?
-</button>
-</div>
-</div>
-</main>
-);
+          <button
+            onClick={login}
+            className="w-full bg-black text-white font-bold p-4 rounded-2xl shadow-lg"
+          >
+            Login
+          </button>
+
+          <button
+            onClick={forgotPassword}
+            className="w-full mt-3 text-blue-600 font-semibold"
+          >
+            Forgot Password?
+          </button>
+        </div>
+      </div>
+    </main>
+  );
 }

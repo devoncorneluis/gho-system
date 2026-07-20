@@ -35,6 +35,23 @@ type ReleaseDashboardData = {
     performanceStatus: string;
     disasterRecoveryStatus: string;
   };
+  uatEnvironment: {
+    schemaVersion: string;
+    seedVersion: string;
+    generatedAt: string;
+    build: string;
+    seedStatus: string;
+    platform: string;
+    drivers: number;
+    vehicles: number;
+    trips: string;
+    emergencies: number;
+    lastReset: string;
+  };
+  releaseBoard: Array<{
+    gate: string;
+    status: string;
+  }>;
   uat: {
     roles: Array<{
       id: "super_admin" | "platform_admin" | "dispatcher" | "driver" | "client" | "executive";
@@ -81,12 +98,62 @@ type ReleaseDashboardData = {
 };
 
 const DOCS_ROOT = path.join(process.cwd(), "docs");
+const UAT_SEED_STATUS_PATH = path.join(process.cwd(), ".uat-seed-status.json");
 
 async function readDoc(relativePath: string): Promise<string> {
   try {
     return await fs.readFile(path.join(DOCS_ROOT, relativePath), "utf8");
   } catch {
     return "";
+  }
+}
+
+async function readUatEnvironmentStatus(): Promise<ReleaseDashboardData["uatEnvironment"]> {
+  try {
+    const rawStatus = await fs.readFile(UAT_SEED_STATUS_PATH, "utf8");
+    const status = JSON.parse(rawStatus) as {
+      seedStatus?: string;
+      schemaVersion?: string;
+      seedVersion?: string;
+      generatedAt?: string;
+      build?: string;
+      platform?: string;
+      drivers?: number;
+      vehicles?: number;
+      trips?: number;
+      todayTrips?: number;
+      totalTrips?: number;
+      emergencies?: number;
+      lastReset?: string;
+    };
+
+    return {
+      schemaVersion: status.schemaVersion || "Unknown",
+      seedVersion: status.seedVersion || "Unknown",
+      generatedAt: status.generatedAt || "Unknown",
+      build: status.build || "Unknown",
+      seedStatus: status.seedStatus || "Unknown",
+      platform: status.platform || "Cape Town Operations",
+      drivers: status.drivers || 0,
+      vehicles: status.vehicles || 0,
+      trips: `${status.trips ?? status.todayTrips ?? 0} today / ${status.totalTrips || 0} total`,
+      emergencies: status.emergencies || 0,
+      lastReset: status.lastReset || "Unknown",
+    };
+  } catch {
+    return {
+      schemaVersion: "1.0",
+      seedVersion: "1.0.0",
+      generatedAt: "Not run",
+      build: "v1.0.0-rc1",
+      seedStatus: "Not Seeded",
+      platform: "Cape Town Operations",
+      drivers: 8,
+      vehicles: 8,
+      trips: "15 today / 45 total",
+      emergencies: 1,
+      lastReset: "Not run",
+    };
   }
 }
 
@@ -101,10 +168,6 @@ function normalizeStatus(value: string): string {
     return "At Risk";
   }
 
-  if (lower.includes("not started") || lower.includes("pending") || lower.includes("planned") || lower === "tbd") {
-    return "Not Started";
-  }
-
   if (lower.includes("complete") || lower.includes("pass") || lower.includes("approved")) {
     return "Complete";
   }
@@ -113,8 +176,18 @@ function normalizeStatus(value: string): string {
     return "Blocked";
   }
 
-  if (lower.includes("in progress") || lower.includes("partial") || lower.includes("ongoing") || lower.includes("active")) {
+  if (
+    lower.includes("in progress") ||
+    lower.includes("execution started") ||
+    lower.includes("partial") ||
+    lower.includes("ongoing") ||
+    lower.includes("active")
+  ) {
     return "In Progress";
+  }
+
+  if (lower.includes("not started") || lower.includes("pending") || lower.includes("planned") || lower === "tbd") {
+    return "Not Started";
   }
 
   return value.trim() || "Unknown";
@@ -194,6 +267,19 @@ function mapUatState(status: string): "not_started" | "in_progress" | "complete"
 }
 
 function extractUatRoleStatus(uatMarkdown: string, roleName: string): string {
+  const progressSection = uatMarkdown.match(
+    /## Current Gate 2 Role Progress[\s\S]*?(?=\n## |\n# |$)/i
+  )?.[0] || "";
+  const progressPattern = new RegExp(
+    `\\|\\s*${roleName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\|\\s*([^|]+)\\|`,
+    "im"
+  );
+  const progressMatch = progressSection.match(progressPattern);
+
+  if (progressMatch?.[1]) {
+    return normalizeStatus(progressMatch[1]);
+  }
+
   const escapedRole = roleName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const rowPattern = new RegExp(
     `\\|\\s*${escapedRole}\\s*\\|[^\\n]+\\|\\s*([^|]+)\\|\\s*[^|]+\\|\\s*[^|]+\\|\\s*[^|]+\\|\\s*[^|]+\\|`,
@@ -206,6 +292,28 @@ function extractUatRoleStatus(uatMarkdown: string, roleName: string): string {
   }
 
   return normalizeStatus(match[1]);
+}
+
+function extractReleaseBoardStatus(markdown: string): ReleaseDashboardData["releaseBoard"] {
+  const section = markdown.match(/## Current Release Board Status[\s\S]*?(?=\n## |\n# |$)/i)?.[0] || "";
+  const rows: ReleaseDashboardData["releaseBoard"] = [];
+
+  for (const line of section.split("\n")) {
+    if (!line.startsWith("|") || line.includes("---") || line.toLowerCase().includes("| gate |")) {
+      continue;
+    }
+
+    const cells = line
+      .split("|")
+      .map((cell) => cell.trim())
+      .filter(Boolean);
+
+    if (cells.length >= 2) {
+      rows.push({ gate: cells[0], status: cells[1] });
+    }
+  }
+
+  return rows;
 }
 
 function countFindings(securityFindings: string, severity: "Critical" | "High"): number {
@@ -345,6 +453,7 @@ export async function GET() {
   const validationEvidence = await readDoc("validation/ValidationEvidence.md");
   const userAcceptanceTesting = await readDoc("validation/UserAcceptanceTesting.md");
   const rc3Stabilization = await readDoc("releases/RC3-Stabilization.md");
+  const uatEnvironment = await readUatEnvironmentStatus();
 
   const architecture = extractReadinessArea(readinessChecklist, "Architecture");
   const security = extractReadinessArea(readinessChecklist, "Security");
@@ -356,6 +465,7 @@ export async function GET() {
 
   const latestProductionBuild = extractMetric(rc3Stabilization, "Latest production build");
   const overallRecommendation = extractOverallRecommendation(rc3Stabilization);
+  const releaseBoard = extractReleaseBoardStatus(rc3Stabilization);
 
   const openCriticalFindings = countFindings(securityFindings, "Critical");
   const openHighFindings = countFindings(securityFindings, "High");
@@ -442,6 +552,8 @@ export async function GET() {
       performanceStatus: performanceBaselineStatus,
       disasterRecoveryStatus,
     },
+    uatEnvironment,
+    releaseBoard,
     uat: {
       roles: normalizedUatRoles,
       startedCount,

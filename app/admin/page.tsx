@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
+import DispatchSummary from "../../components/dispatch/DispatchSummary";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 
@@ -129,6 +130,10 @@ export default function AdminPage() {
               <p className="text-gray-300 text-sm mt-1">Live operations mode</p>
             </div>
           </div>
+        </section>
+
+        <section className="mt-6">
+          <DispatchSummary trips={28} passengers={247} drivers={19} vehicles={19} />
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">

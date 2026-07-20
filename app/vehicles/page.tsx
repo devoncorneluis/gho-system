@@ -16,10 +16,16 @@ type Vehicle = {
   passenger_limit: string | null;
   vehicle_photo: string | null;
   status: string | null;
+  assigned_driver: string | null;   // ← ADD THIS
 };
-
+type Driver = {
+  id: string;
+  full_name: string;
+};
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+const [assignedDriver, setAssignedDriver] = useState("");
   const [name, setName] = useState("");
   const [registration, setRegistration] = useState("");
   const [type, setType] = useState("Suzuki 7 Seater");
@@ -28,7 +34,10 @@ export default function VehiclesPage() {
   const [vehiclePhoto, setVehiclePhoto] = useState("");
   const [uploading, setUploading] = useState(false);
   const [platformId, setPlatformId] = useState<string | null>(null);
-
+const assignedVehicles = vehicles.filter(v => v.assigned_driver).length;
+const unassignedVehicles = vehicles.filter(v => !v.assigned_driver).length;
+const availableVehicles = vehicles.filter(v => v.status === "Available").length;
+const maintenanceVehicles = vehicles.filter(v => v.status === "Maintenance").length;
   async function loadVehicles() {
     if (!platformId) return;
 
@@ -45,6 +54,25 @@ export default function VehiclesPage() {
 
     setVehicles(data || []);
   }
+
+async function loadDrivers() {
+  if (!platformId) return;
+
+  const { data, error } = await supabase
+    .from("drivers")
+    .select("id, full_name")
+    .eq("platform_id", platformId)
+    .order("full_name");
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setDrivers(data ?? []);
+}
+
+
 
   async function uploadVehiclePhoto(file: File) {
     if (!platformId) {
@@ -81,7 +109,15 @@ export default function VehiclesPage() {
     setVehiclePhoto(data.publicUrl);
     setUploading(false);
   }
+function getDriverName(driverId: string | null) {
+  if (!driverId) {
+    return "Unassigned";
+  }
 
+  const driver = drivers.find((d) => d.id === driverId);
+
+  return driver?.full_name ?? "Unknown Driver";
+}
   async function saveVehicle() {
     if (!platformId) {
       alert("Platform not loaded yet.");
@@ -93,16 +129,39 @@ export default function VehiclesPage() {
       return;
     }
 
-    const { error } = await supabase.from("vehicles").insert({
-      platform_id: platformId,
-      vehicle_name: name,
-      registration_number: registration,
-      vehicle_type: type,
-      vehicle_colour: colour,
-      passenger_limit: passengerLimit,
-      vehicle_photo: vehiclePhoto,
-      status: "Available",
-    });
+
+  if (assignedDriver) {
+  const { data: existingVehicle, error: existingError } = await supabase
+    .from("vehicles")
+    .select("vehicle_name")
+    .eq("assigned_driver", assignedDriver)
+    .maybeSingle();
+
+  if (existingError) {
+    alert(existingError.message);
+    return;
+  }
+
+  if (existingVehicle) {
+    alert(
+      `This driver is already assigned to ${existingVehicle.vehicle_name}.`
+    );
+    return;
+  }
+}
+const { error } = await supabase
+  .from("vehicles")
+  .insert({
+    platform_id: platformId,
+    vehicle_name: name,
+    registration_number: registration,
+    vehicle_type: type,
+    vehicle_colour: colour,
+    passenger_limit: passengerLimit,
+    vehicle_photo: vehiclePhoto,
+    assigned_driver: assignedDriver || null,
+    status: "Available",
+  });
 
     if (error) {
       alert(error.message);
@@ -115,7 +174,7 @@ export default function VehiclesPage() {
     setColour("");
     setPassengerLimit("");
     setVehiclePhoto("");
-
+setAssignedDriver("");
     loadVehicles();
   }
 
@@ -137,7 +196,8 @@ useEffect(() => {
   useEffect(() => {
     if (!platformId) return;
 
-    loadVehicles();
+loadVehicles();
+loadDrivers();
   }, [platformId]);
 
   return (
@@ -148,10 +208,54 @@ useEffect(() => {
         <p className="text-gray-600 mt-2">
           Add and manage GHO fleet vehicles.
         </p>
+<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
 
+  <div className="bg-white rounded-xl shadow p-5">
+    <p className="text-gray-500">Total Vehicles</p>
+    <p className="text-3xl font-black">{vehicles.length}</p>
+  </div>
+
+  <div className="bg-white rounded-xl shadow p-5">
+    <p className="text-gray-500">Assigned</p>
+    <p className="text-3xl font-black text-blue-600">
+      {assignedVehicles}
+    </p>
+  </div>
+
+  <div className="bg-white rounded-xl shadow p-5">
+    <p className="text-gray-500">Unassigned</p>
+    <p className="text-3xl font-black text-orange-600">
+      {unassignedVehicles}
+    </p>
+  </div>
+
+  <div className="bg-white rounded-xl shadow p-5">
+    <p className="text-gray-500">Available</p>
+    <p className="text-3xl font-black text-green-600">
+      {availableVehicles}
+    </p>
+  </div>
+
+</div>
         <div className="bg-white rounded-xl shadow p-6 mt-6">
           <h2 className="text-xl font-bold mb-4">Add Vehicle</h2>
+<div className="mt-4 flex gap-2">
 
+  <button
+    className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold"
+    onClick={() => alert("Edit Vehicle - Next Step")}
+  >
+    Edit
+  </button>
+
+  <button
+    className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold"
+    onClick={() => alert("Delete Vehicle - Next Step")}
+  >
+    Delete
+  </button>
+
+</div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               value={name}
@@ -192,6 +296,19 @@ useEffect(() => {
               className="border p-3 rounded-lg"
               placeholder="Passenger Limit"
             />
+            <select
+  value={assignedDriver}
+  onChange={(e) => setAssignedDriver(e.target.value)}
+  className="border p-3 rounded-lg"
+>
+  <option value="">Select Driver</option>
+
+  {drivers.map((driver) => (
+    <option key={driver.id} value={driver.id}>
+      {driver.full_name}
+    </option>
+  ))}
+</select>
 
             <div className="border rounded-lg p-3">
               <label className="block font-bold text-[#061B33] mb-2">
@@ -277,7 +394,10 @@ useEffect(() => {
                     👥 <strong>Passenger Limit:</strong>{" "}
                     {vehicle.passenger_limit || "Not set"}
                   </p>
-
+<p>
+  👨‍✈️ <strong>Assigned Driver:</strong>{" "}
+  {getDriverName(vehicle.assigned_driver)}
+</p>
                   <p>
                     {vehicle.status === "Available" ? "🟢" : "🔴"}{" "}
                     <strong>Status:</strong> {vehicle.status || "Unknown"}
