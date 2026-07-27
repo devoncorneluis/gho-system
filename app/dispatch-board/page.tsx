@@ -5,6 +5,7 @@ import Link from "next/link";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
+import { dispatchTrip } from "@/lib/dispatchService";
 
 
 type Trip = {
@@ -30,6 +31,7 @@ const [statusFilter, setStatusFilter] = useState("All");
 const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
 const [showDrawer, setShowDrawer] = useState(false);
 const [passengerPreview, setPassengerPreview] = useState<string[]>([]);
+const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   useEffect(() => {
     async function loadPlatform() {
       const userPlatform = await getUserPlatform();
@@ -40,6 +42,11 @@ const [passengerPreview, setPassengerPreview] = useState<string[]>([]);
       }
 
       setPlatformId(userPlatform.platformId);
+      const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+setCurrentUserId(user?.id ?? null);
     }
 
     loadPlatform();
@@ -79,7 +86,7 @@ const [passengerPreview, setPassengerPreview] = useState<string[]>([]);
 
     setLoading(false);
   }
-  async function loadPassengerPreview(tripId: string) {
+async function loadPassengerPreview(tripId: string) {
   const { data } = await supabase
     .from("trip_passengers")
     .select("full_name")
@@ -91,6 +98,29 @@ const [passengerPreview, setPassengerPreview] = useState<string[]>([]);
     (data || []).map((row) => row.full_name)
   );
 }
+
+async function handleDispatchTrip() {
+  if (!selectedTrip || !platformId) return;
+
+const success = await dispatchTrip(
+  selectedTrip.id,
+  platformId,
+  currentUserId ?? "system"
+);
+
+  if (!success) {
+    alert("Unable to dispatch trip.");
+    return;
+  }
+
+  await loadTrips();
+
+  setSelectedTrip({
+    ...selectedTrip,
+    status: "Dispatched",
+  });
+}
+
 useEffect(() => {
   if (!platformId) return;
 
@@ -567,11 +597,12 @@ onClick={async () => {
 
   <div className="grid grid-cols-1 gap-3">
 
-    <button
-      className="bg-blue-600 text-white rounded-xl p-3 hover:bg-blue-700"
-    >
-      Dispatch Trip
-    </button>
+<button
+onClick={handleDispatchTrip}
+  className="bg-blue-600 text-white rounded-xl p-3 hover:bg-blue-700"
+>
+  Dispatch Trip
+</button>
 
     <button
       className="bg-orange-500 text-white rounded-xl p-3 hover:bg-orange-600"

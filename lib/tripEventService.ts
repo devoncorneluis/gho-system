@@ -9,6 +9,8 @@ export interface TripEvent {
 }
 
 export async function recordTripEvent(event: TripEvent) {
+  console.log("Recording trip event:", event);
+
   const { error } = await supabase
     .from("trip_events")
     .insert({
@@ -20,6 +22,9 @@ export async function recordTripEvent(event: TripEvent) {
     });
 
   if (error) {
+    console.error("Trip event insert failed:", error);
     throw error;
   }
+
+  console.log("Trip event saved successfully.");
 }

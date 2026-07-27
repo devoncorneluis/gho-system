@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import { supabase } from "../../lib/supabase";
-
+import { recordTripEvent } from "../../lib/tripEventService";
 type Agent = {
   id: string;
 
@@ -78,8 +78,9 @@ const [adminCapacity, setAdminCapacity] = useState<Record<string, string>>({});;
       .from("route_groups")
 .select("id, group_name, areas")
       .eq("platform_id", activePlatformId)
-      .eq("status", "Active")
+.eq("active", true)
 .order("group_name")
+
 
     if (error) {
       alert(error.message);
@@ -111,6 +112,9 @@ const [adminCapacity, setAdminCapacity] = useState<Record<string, string>>({});;
 .eq("platform_id", activePlatformId)
 .eq("employee_status", "Active")
 .order("pickup_area");
+console.log("ACTIVE PLATFORM:", activePlatformId);
+console.log("AGENTS ERROR:", error);
+console.log("AGENTS DATA:", data);
     if (error) {
       alert(error.message);
       return;
@@ -120,30 +124,31 @@ const [adminCapacity, setAdminCapacity] = useState<Record<string, string>>({});;
   }
 
   async function loadDriversAndVehicles(activePlatformId: string) {
-    const { data: driverData, error: driverError } = await supabase
-.from("drivers")
-.select("id, full_name")
-.eq("platform_id", activePlatformId)
-.eq("status", "Available")
+const { data: driverData, error: driverError } = await supabase
+  .from("drivers")
+  .select("id, full_name")
+  .eq("platform_id", activePlatformId)
+  .eq("status", "Available")
+  .eq("availability_status", "Available");
+if (driverError) {
+  alert(driverError.message);
+  return;
+}
 
-    if (driverError) {
-      alert(driverError.message);
-      return;
-    }
-
-    const { data: vehicleData, error: vehicleError } = await supabase
-      .from("vehicles")
-.select(`
-  id,
-  vehicle_name,
-  vehicle_type,
-  registration_number,
-  passenger_limit,
-  assigned_driver
-`)
-      .eq("platform_id", activePlatformId)
-      .eq("status", "Available")
-      .order("vehicle_name");
+const { data: vehicleData, error: vehicleError } = await supabase
+  .from("vehicles")
+  .select(`
+    id,
+    vehicle_name,
+    vehicle_type,
+    registration_number,
+    passenger_limit,
+    assigned_driver
+  `)
+  .eq("platform_id", activePlatformId)
+  .eq("status", "Available")
+  .eq("availability_status", "Available")
+  .order("vehicle_name");
 
 if (vehicleError) {
   alert(vehicleError.message);
@@ -430,7 +435,20 @@ const { data: savedTrip, error: tripError } = await supabase
       alert(tripError?.message || "Trip could not be saved");
       return;
     }
-
+await recordTripEvent({
+  tripId: savedTrip.id,
+  platformId,
+  createdBy: driver.id,
+  eventType: "trip_dispatched",
+  eventData: {
+    description: `${tripCode} dispatched.`,
+    tripCode,
+    driverName: driver.full_name,
+    vehicleName: vehicle.vehicle_name,
+    route: routeName,
+    passengers: areaAgents.length,
+  },
+});
 const passengersToSave = areaAgents.map((agent) => ({
   platform_id: platformId,
   trip_id: savedTrip.id,

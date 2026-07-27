@@ -10,7 +10,11 @@ import { appendTelemetryToAuditTrail } from "../observability/auditBridge";
 import { recordTelemetryEvent } from "../observability/telemetryEngine";
 import { runAutomationEngine } from "./automationEngine";
 import { AUTOMATION_RULES } from "./automationRules";
-
+import { getFleetStatus } from "../operations/fleetStatus";
+import {
+  getOperationsTimeline,
+  type TimelineEvent,
+} from "../operations/timelineService";
 export type ControlTowerAction =
   | "approve_recommendation"
   | "reassign_driver"
@@ -29,7 +33,15 @@ export interface ActionGuardrailTelemetry {
   errorCountLastHour: number;
   happenedAt: string;
 }
-
+export type FleetStatusItem = {
+  id: string;
+  driverName: string;
+  vehicleName: string;
+  tripCode: string | null;
+  gpsConnected: boolean;
+  status: "Available" | "Assigned" | "En Route" | "Emergency";
+  lastUpdate: string | null;
+};
 export interface RecommendationDetails {
   driverScore: number;
   distanceKm: number;
@@ -45,6 +57,9 @@ export interface RecommendationDetails {
 export interface ControlTowerSnapshot {
   recommendation?: ReassignmentRecommendation;
   recommendationDetails?: RecommendationDetails;
+
+  fleetStatus: FleetStatusItem[];
+
   escalations: Array<{
     id: string;
     severity: "low" | "medium" | "high" | "critical";
@@ -53,33 +68,39 @@ export interface ControlTowerSnapshot {
     recommendedAction: string;
     deadline: string;
   }>;
-  workflows: {
-    running: number;
-    waiting: number;
-    completed: number;
-    failed: number;
-    paused: number;
-  };
-  automationStatus: {
-    rulesLoaded: number;
-    recommendationsToday: number;
-    escalationsToday: number;
-    workflowsRunning: number;
-    automationHealth: "Healthy" | "Degraded" | "Down";
-    lastEvaluation: string;
-  };
-  monitoring: MonitoringSnapshot;
-  summaryCards: {
-    fleet: number;
-    dispatch: number;
-    sla: number;
-    delay: number;
-    risk: number;
-    emergencies: number;
-    automation: number;
-  };
-  auditTrail: string[];
+
+workflows: {
+  running: number;
+  waiting: number;
+  completed: number;
+  failed: number;
+  paused: number;
+};
+
+automationStatus: {
+  rulesLoaded: number;
+  recommendationsToday: number;
+  escalationsToday: number;
+  workflowsRunning: number;
+  automationHealth: "Healthy" | "Degraded" | "Down";
+  lastEvaluation: string;
+};
+
+monitoring: MonitoringSnapshot;
+timeline: TimelineEvent[];
+summaryCards: {
+  fleet: number;
+  dispatch: number;
+  sla: number;
+  delay: number;
+  risk: number;
+  emergencies: number;
+  automation: number;
+};
+
+auditTrail: string[];
 }
+
 
 function buildDemoCandidates() {
   return {
@@ -275,10 +296,14 @@ export async function evaluateControlTower(
         happenedAt: telemetry.happenedAt,
       })
     : undefined;
-
+const fleetStatus = await getFleetStatus();
+const timeline = await getOperationsTimeline();
   return {
     recommendation,
     recommendationDetails,
+
+    fleetStatus,
+    timeline,
     escalations: automationResult.escalations,
     workflows: {
       running: workflowsRunning,

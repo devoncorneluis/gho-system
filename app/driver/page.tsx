@@ -7,8 +7,10 @@ import {
   updateTripStatus as dispatchUpdateTripStatus,
   acceptDriverDispatch,
   rejectDriverDispatch,
+  arriveAtPickup,
 } from "../../lib/dispatchService";
 import { TRIP_STATUS } from "../../lib/tripStatus";
+import { error } from "console";
 
 type Trip = {
   id: string;
@@ -73,7 +75,20 @@ export default function DriverPage() {
   const [tracking, setTracking] = useState(false);
   const [watchId, setWatchId] = useState<number | null>(null);
   const [locationMessage, setLocationMessage] = useState("");
+  const [currentLatitude, setCurrentLatitude] = useState<number | null>(null);
+const [currentLongitude, setCurrentLongitude] = useState<number | null>(null);
 const [liveDrivers, setLiveDrivers] = useState<LiveDriver[]>([]);
+const [showIncidentMenu, setShowIncidentMenu] = useState(false);
+const incidentTypes = [
+    "🚧 Road Closed",
+    "🚦 Heavy Traffic",
+    "🚓 Accident",
+    "🚑 Medical Emergency",
+    "🚐 Vehicle Breakdown",
+    "👤 Passenger No Show",
+    "⛽ Fuel Stop",
+    "🛠 Other Issue",
+  ];
   async function setupDriver() {
 
     const userPlatform = await getUserPlatform();
@@ -237,19 +252,23 @@ await supabase.from("driver_location_history").insert({
     }
 
     const id = navigator.geolocation.watchPosition(
-      async (position) => {
-await saveDriverLocation(
-  position.coords.latitude,
-  position.coords.longitude,
-  position.coords.speed,
-  position.coords.heading,
-  position.coords.accuracy,
-  selectedTripId
-);
 
-        setTracking(true);
-        setLocationMessage("Signed in successfully. GPS tracking active.");
-      },
+async (position) => {
+  setCurrentLatitude(position.coords.latitude);
+  setCurrentLongitude(position.coords.longitude);
+
+  await saveDriverLocation(
+    position.coords.latitude,
+    position.coords.longitude,
+    position.coords.speed,
+    position.coords.heading,
+    position.coords.accuracy,
+    selectedTripId
+  );
+
+  setTracking(true);
+  setLocationMessage("Signed in successfully. GPS tracking active.");
+},
       () => {
         alert("Location permission denied.");
       },
@@ -343,7 +362,22 @@ setupDriver();
   }
 }
 
+async function handleArriveAtPickup(trip: Trip) {
+  if (!driver) return;
 
+  try {
+    await arriveAtPickup(
+      supabase,
+      trip.id,
+      platformId,
+      driver.id
+    );
+
+    await setupDriver();
+  } catch (err: any) {
+    alert(err.message);
+  }
+}
 
   async function acceptTrip(trip: Trip) {
     if (!trip.status) {
@@ -423,9 +457,20 @@ if (
   tripPassengers.length > 0 &&
   pickedUp === tripPassengers.length
 ) {
-  alert(
-    "✅ All passengers collected.\n\nYou can now complete this trip."
+if (
+  tripPassengers.length > 0 &&
+  pickedUp === tripPassengers.length &&
+  selectedTrip
+) {
+  await updateTripStatus(
+    selectedTrip,
+    TRIP_STATUS.IN_TRANSIT
   );
+
+  alert(
+    "✅ All passengers collected.\n\nTrip is now In Transit."
+  );
+}
 }
     }
   }
@@ -451,11 +496,89 @@ if (
     const value = status || "assigned";
     return value.toLowerCase();
   }
+function DriverProgressTimeline({ status }: { status: string | null }) {
+  const steps = [
+    { label: "Dispatch Received", status: "dispatched" },
+    { label: "Trip Accepted", status: "accepted" },
+    { label: "En Route", status: "en_route" },
+    { label: "Arrived at Pickup", status: "picking_up" },
+    { label: "In Transit", status: "in_transit" },
+    { label: "Completed", status: "completed" },
+  ];
 
+  const currentIndex = steps.findIndex(
+    (step) => step.status === (status || "")
+  );
+
+  return (
+    <div className="rounded-2xl border bg-gray-50 p-4 mt-6">
+      <h3 className="font-bold text-[#061B33] mb-3">
+        Trip Progress
+      </h3>
+
+      <div className="space-y-2">
+        {steps.map((step, index) => (
+          <div
+            key={step.status}
+            className="flex items-center gap-3"
+          >
+            <span className="text-lg">
+              {index <= currentIndex ? "✅" : "⬜"}
+            </span>
+
+            <span
+              className={
+                index <= currentIndex
+                  ? "font-semibold text-green-700"
+                  : "text-gray-500"
+              }
+            >
+              {step.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
   function createSupportTicket() {
     alert("Support ticket feature coming soon.");
   }
+async function reportIncident(incident: string) {
+  if (!selectedTrip || !driver || !platformId) {
+    alert("No active trip selected.");
+    return;
+  }
 
+const { error } = await supabase
+  .from("emergency_alerts")
+.insert({
+  platform_id: platformId,
+  trip_id: selectedTrip.id,
+  driver_id: driver.id,
+
+driver_name: driver.full_name,
+  vehicle_name: selectedTrip.vehicle_name,
+  vehicle_registration: selectedTrip.vehicle_registration,
+
+  alert_type: incident,
+  description: incident,
+  notes: "",
+latitude: currentLatitude,
+longitude: currentLongitude,
+  status: "Open",
+  created_at: new Date().toISOString(),
+});
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  alert("✅ Incident reported successfully.");
+
+  setShowIncidentMenu(false);
+}
   useEffect(() => {
 
     setupDriver();
@@ -475,6 +598,7 @@ if (
     : [];
 
   return (
+
     <main className="min-h-screen bg-[#F6F7FB] text-gray-700">
       <header className="bg-white border-b sticky top-0 z-40 p-4">
         <div className="flex items-center justify-between">
@@ -599,7 +723,14 @@ TRIP_STATUS.EN_ROUTE
                           </>
                         )}
                       </div>
-
+{trip.status === TRIP_STATUS.EN_ROUTE && (
+  <button
+    onClick={() => handleArriveAtPickup(trip)}
+    className="bg-orange-600 text-white rounded-xl px-3 py-3 font-bold"
+  >
+    Arrived at Pickup
+  </button>
+)}
                       <button
                         onClick={() =>
                           openGoogleMaps(firstPassenger?.pickup_address || trip.area)
@@ -680,7 +811,35 @@ TRIP_STATUS.EN_ROUTE
                 </p>
                 <p className="text-gray-400">Distance</p>
               </div>
+<DriverProgressTimeline status={selectedTrip.status} />
+<div className="mt-6">
+  <button
+    onClick={() => setShowIncidentMenu(!showIncidentMenu)}
+    className="w-full rounded-xl bg-red-600 px-4 py-3 font-bold text-white hover:bg-red-700"
+  >
+    🚨 Report Incident
+  </button>
 
+  {showIncidentMenu && (
+    <div className="mt-3 rounded-2xl border bg-white p-4 shadow">
+      <p className="mb-3 font-bold text-[#061B33]">
+        Select Incident
+      </p>
+
+      <div className="grid gap-2">
+        {incidentTypes.map((incident) => (
+          <button
+            key={incident}
+onClick={() => reportIncident(incident)}
+            className="rounded-lg border p-3 text-left hover:bg-gray-100"
+          >
+            {incident}
+          </button>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
               <button
                 onClick={createSupportTicket}
                 className="border border-green-500 text-green-600 rounded-lg px-4 py-2 font-bold mt-6"

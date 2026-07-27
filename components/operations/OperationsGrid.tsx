@@ -1,5 +1,5 @@
 "use client";
-
+import OperationsTimelinePanel from "./OperationsTimelinePanel";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   ActionGuardrailTelemetry,
@@ -18,7 +18,7 @@ import OperationsMap from "./OperationsMap";
 import RecommendationDrawer from "./RecommendationDrawer";
 import RecommendationPanel from "./RecommendationPanel";
 import WorkflowQueuePanel from "./WorkflowQueuePanel";
-
+import LiveFleetStatusPanel from "./LiveFleetStatusPanel";
 type SummaryCard = {
   key: keyof ControlTowerSnapshot["summaryCards"];
   label: string;
@@ -38,7 +38,12 @@ const SUMMARY_CARDS: SummaryCard[] = [
 const EMPTY_SNAPSHOT: ControlTowerSnapshot = {
   recommendation: undefined,
   recommendationDetails: undefined,
+
+  fleetStatus: [],
+  timeline: [],
+
   escalations: [],
+
   workflows: {
     running: 0,
     waiting: 0,
@@ -46,6 +51,7 @@ const EMPTY_SNAPSHOT: ControlTowerSnapshot = {
     failed: 0,
     paused: 0,
   },
+
   automationStatus: {
     rulesLoaded: 0,
     recommendationsToday: 0,
@@ -54,6 +60,7 @@ const EMPTY_SNAPSHOT: ControlTowerSnapshot = {
     automationHealth: "Healthy",
     lastEvaluation: new Date().toISOString(),
   },
+
   monitoring: {
     overallStatus: "healthy",
     checks: [],
@@ -62,6 +69,7 @@ const EMPTY_SNAPSHOT: ControlTowerSnapshot = {
     realtimeConnected: true,
     capturedAt: new Date().toISOString(),
   },
+
   summaryCards: {
     fleet: 0,
     dispatch: 0,
@@ -71,6 +79,7 @@ const EMPTY_SNAPSHOT: ControlTowerSnapshot = {
     emergencies: 0,
     automation: 0,
   },
+
   auditTrail: [],
 };
 
@@ -166,34 +175,45 @@ export default function OperationsGrid() {
         ))}
       </div>
 
-      <div className="rounded-3xl border border-gray-200 bg-white p-3 shadow-sm">
-        <OperationsMap />
-      </div>
+<div className="rounded-3xl border border-gray-200 bg-white p-3 shadow-sm">
+  <OperationsMap />
+</div>
 
-      <AutomationStatusPanel status={snapshot.automationStatus} monitoring={snapshot.monitoring} />
+<EnterpriseIntelligencePanel />
 
-      <EnterpriseIntelligencePanel />
+<div className="grid gap-6 xl:grid-cols-2">
+  <RecommendationPanel
+    recommendation={snapshot.recommendation}
+    details={snapshot.recommendationDetails}
+    onApprove={() => refresh("approve_recommendation")}
+    onIgnore={() => refresh("resolve_alert")}
+    onViewReasoning={() => setDrawerOpen(true)}
+  />
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <RecommendationPanel
-          recommendation={snapshot.recommendation}
-          details={snapshot.recommendationDetails}
-          onApprove={() => refresh("approve_recommendation")}
-          onIgnore={() => refresh("resolve_alert")}
-          onViewReasoning={() => setDrawerOpen(true)}
-        />
-        <EscalationQueuePanel escalations={snapshot.escalations} />
-      </div>
+  <ActionCenterPanel
+    onAction={(action) => refresh(action)}
+    onGuardrailEvent={logGuardrailEvent}
+    busy={loadingAction}
+    monitoring={snapshot.monitoring}
+  />
+</div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <WorkflowQueuePanel statuses={snapshot.workflows} />
-        <ActionCenterPanel
-          onAction={(action) => refresh(action)}
-          onGuardrailEvent={logGuardrailEvent}
-          busy={loadingAction}
-          monitoring={snapshot.monitoring}
-        />
-      </div>
+<div className="grid gap-6 xl:grid-cols-2">
+  <LiveFleetStatusPanel fleet={snapshot.fleetStatus} />
+
+  <EscalationQueuePanel escalations={snapshot.escalations} />
+</div>
+<div className="grid gap-6">
+  <OperationsTimelinePanel events={snapshot.timeline} />
+</div>
+<div className="grid gap-6 xl:grid-cols-2">
+  <WorkflowQueuePanel statuses={snapshot.workflows} />
+
+  <AutomationStatusPanel
+    status={snapshot.automationStatus}
+    monitoring={snapshot.monitoring}
+  />
+</div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <ActivityFeedPanel />

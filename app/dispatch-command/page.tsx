@@ -1,5 +1,5 @@
 "use client";
-
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
@@ -24,7 +24,7 @@ async function dispatchTrip(tripId: string) {
   const { error } = await supabase
     .from("trips")
 .update({
-  status: "dispatched",
+status: "Dispatched",
   dispatched_at: new Date().toISOString(),
 })
     .eq("id", tripId);
@@ -36,7 +36,27 @@ async function dispatchTrip(tripId: string) {
 
   await loadTrips();
 }
+async function cancelTrip(id: string) {
+  const confirmed = window.confirm(
+    "Cancel this trip?"
+  );
 
+  if (!confirmed) return;
+
+  const { error } = await supabase
+    .from("trips")
+    .update({
+      status: "Cancelled",
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadTrips();
+}
 async function loadTrips() {
   const { data, error } = await supabase
     .from("trips")
@@ -89,9 +109,12 @@ function buildAlerts() {
   });
   setAlerts(list);
 }
-useEffect(() => {
-  loadTrips();
 
+useEffect(() => {
+  buildAlerts();
+}, [trips]);
+// Auto refresh every 10 seconds
+useEffect(() => {
   const interval = setInterval(() => {
     loadTrips();
   }, 10000);
@@ -99,10 +122,38 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, []);
 
-useEffect(() => {
-  buildAlerts();
-}, [trips]);
+// Dashboard summary cards
+const activeTrips = trips.filter(
+  (t) =>
+    t.status === "Dispatched" ||
+    t.status === "Accepted" ||
+    t.status === "In Progress"
+).length;
 
+const awaitingDrivers = trips.filter(
+  (t) => !t.driver_response
+).length;
+
+const rejectedTrips = trips.filter(
+  (t) => t.driver_response === "rejected"
+).length;
+
+const completedTrips = trips.filter(
+  (t) => t.status === "Completed"
+).length;
+const filteredTrips = trips.filter((trip) => {
+  const matchesSearch =
+    search === "" ||
+    trip.trip_code?.toLowerCase().includes(search.toLowerCase()) ||
+    trip.driver_name?.toLowerCase().includes(search.toLowerCase()) ||
+    trip.vehicle_name?.toLowerCase().includes(search.toLowerCase());
+
+  const matchesStatus =
+    statusFilter === "all" ||
+    trip.status === statusFilter;
+
+  return matchesSearch && matchesStatus;
+});
   return (
     <AdminLayout>
       <main className="min-h-screen bg-gray-100 p-6">
@@ -113,153 +164,193 @@ useEffect(() => {
         <p className="mt-2 text-gray-600">
           Monitor and control all live transport operations.
         </p>
-<p className="mt-2 text-sm text-green-600 font-semibold">
-  🟢 Auto Refresh: Every 10 seconds
-</p>
-<div className="mt-6 mb-4">
-  <input
-    type="text"
-    placeholder="🔍 Search Trip, Driver or Vehicle..."
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    className="w-full rounded-lg border p-3"
-  />
-  <div className="mt-3 mb-6">
-  <select
-    value={statusFilter}
-    onChange={(e) => setStatusFilter(e.target.value)}
-    className="rounded-lg border p-3"
-  >
-    <option value="all">All Trips</option>
-    <option value="assigned">Assigned</option>
-    <option value="dispatched">Dispatched</option>
-    <option value="accepted">Accepted</option>
-    <option value="en_route">En Route</option>
-    <option value="completed">Completed</option>
-  </select>
-</div>
-</div>
-{alerts.length > 0 && (
-  <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-5">
-    <h2 className="mb-3 text-xl font-bold text-red-700">
-      🚨 Operations Alerts
-    </h2>
 
-    <ul className="space-y-2">
-      {alerts.map((alert, index) => (
-        <li key={index} className="text-red-700">
-          • {alert}
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
-        <div className="mt-8 rounded-xl bg-white p-6 shadow">
-          <h2 className="mb-4 text-2xl font-bold">
-            🚐 Live Dispatch Queue
-          </h2>
+        <div className="mt-6 grid gap-4 md:grid-cols-4">
+          <div className="rounded-xl bg-white p-5 shadow">
+            <p className="text-sm text-gray-500">🚐 Active Trips</p>
+            <p className="text-3xl font-black">{activeTrips}</p>
+          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b">
-                <tr>
-                  <th className="py-3 text-left">Trip</th>
-                  <th className="text-left">Driver</th>
-                  <th className="text-left">Vehicle</th>
-                  <th className="text-left">Passengers</th>
-                  <th className="text-left">Status</th>
-                  <th className="text-left">Response</th>
-                  <th className="text-left">Actions</th>
-                </tr>
-              </thead>
+          <div className="rounded-xl bg-white p-5 shadow">
+            <p className="text-sm text-gray-500">⏳ Awaiting Driver</p>
+            <p className="text-3xl font-black text-orange-600">
+              {awaitingDrivers}
+            </p>
+          </div>
 
-              <tbody>
-{trips
-.filter((trip) => {
-  const q = search.toLowerCase();
+          <div className="rounded-xl bg-white p-5 shadow">
+            <p className="text-sm text-gray-500">❌ Rejected</p>
+            <p className="text-3xl font-black text-red-600">
+              {rejectedTrips}
+            </p>
+          </div>
 
-  const matchesSearch =
-    (trip.trip_code ?? "").toLowerCase().includes(q) ||
-    (trip.driver_name ?? "").toLowerCase().includes(q) ||
-    (trip.vehicle_name ?? "").toLowerCase().includes(q);
-
-  const matchesStatus =
-    statusFilter === "all" || trip.status === statusFilter;
-
-  return matchesSearch && matchesStatus;
-})
-.map((trip) => (
-                  <tr key={trip.id} className="border-b">
-                    <td className="py-3">{trip.trip_code}</td>
-                    <td>{trip.driver_name ?? "-"}</td>
-                    <td>{trip.vehicle_name ?? "-"}</td>
-                    <td>{trip.passenger_count ?? 0}</td>
-
-                    <td>
-                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold">
-                        {trip.status ?? "-"}
-                      </span>
-                    </td>
-
-                    <td>
-                      {trip.driver_response === "accepted" ? (
-                        <span className="font-bold text-green-600">
-                          ✅ Accepted
-                        </span>
-                      ) : trip.driver_response === "rejected" ? (
-                        <span className="font-bold text-red-600">
-                          ❌ Rejected
-                        </span>
-                      ) : (
-                        <span className="font-bold text-orange-600">
-                          ⏳ Awaiting
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="space-x-2">
-                      <button
-                        onClick={() =>
-                          (window.location.href = `/trips/${trip.id}`)
-                        }
-                        className="rounded-lg bg-[#061B33] px-3 py-2 text-sm font-bold text-white hover:bg-orange-500"
-                      >
-                        👥 Manifest
-                      </button>
-<button
-  disabled={
-    trip.status === "started" ||
-    trip.status === "completed"
-  }
-  onClick={() => dispatchTrip(trip.id)}
-  className={`rounded-lg px-3 py-2 text-sm font-bold text-white ${
-    trip.status === "started" ||
-    trip.status === "completed"
-      ? "cursor-not-allowed bg-gray-400"
-      : "bg-blue-600 hover:bg-blue-700"
-  }`}
->
-  {trip.status === "started"
-    ? "🚐 Started"
-    : trip.status === "completed"
-    ? "✅ Completed"
-    : "📤 Dispatch"}
-</button>
-                      <button
-                        onClick={() =>
-                          (window.location.href = `/live-dispatch/${trip.id}`)
-                        }
-                        className="rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white hover:bg-green-700"
-                      >
-                        📍 Live Map
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="rounded-xl bg-white p-5 shadow">
+            <p className="text-sm text-gray-500">✅ Completed</p>
+            <p className="text-3xl font-black text-green-600">
+              {completedTrips}
+            </p>
           </div>
         </div>
+<div className="mt-6 rounded-xl bg-white shadow">
+  <div className="border-b p-5">
+    <h2 className="text-2xl font-bold text-[#061B33]">
+      🚦 Live Dispatch Queue
+    </h2>
+  </div>
+
+  <div className="overflow-x-auto">
+    <table className="min-w-full">
+      <thead className="bg-gray-100">
+        <tr>
+          <th className="p-3 text-left">Trip</th>
+          <th className="p-3 text-left">Driver</th>
+          <th className="p-3 text-left">Vehicle</th>
+          <th className="p-3 text-left">Passengers</th>
+          <th className="p-3 text-left">Status</th>
+          <th className="p-3 text-left">Driver Response</th>
+          <th className="p-3 text-center">Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {filteredTrips.map((trip) => (
+          <tr
+            key={trip.id}
+            className="border-t hover:bg-gray-50"
+          >
+            <td className="p-3 font-semibold">
+              {trip.trip_code ?? "-"}
+            </td>
+
+            <td className="p-3">
+              {trip.driver_name ?? (
+                <span className="text-red-500">
+                  Not Assigned
+                </span>
+              )}
+            </td>
+
+            <td className="p-3">
+              {trip.vehicle_name ?? (
+                <span className="text-red-500">
+                  Not Assigned
+                </span>
+              )}
+            </td>
+
+            <td className="p-3">
+              {trip.passenger_count ?? 0}
+            </td>
+
+<td className="p-3">
+  <span
+    className={`rounded-full px-3 py-1 text-sm font-semibold text-white
+      ${
+        trip.status === "Assigned"
+          ? "bg-gray-500"
+          : trip.status === "Dispatched"
+          ? "bg-orange-500"
+          : trip.status === "Accepted"
+          ? "bg-blue-600"
+          : trip.status === "In Progress"
+          ? "bg-indigo-600"
+          : trip.status === "Completed"
+          ? "bg-green-600"
+          : "bg-red-500"
+      }`}
+  >
+    {trip.status ?? "Unknown"}
+  </span>
+</td>
+
+            <td className="p-3">
+              {trip.driver_response ?? "Awaiting"}
+            </td>
+
+            <td className="p-3 text-center">
+<td className="p-3">
+  <div className="flex flex-wrap justify-center gap-2">
+    <button
+      onClick={() => dispatchTrip(trip.id)}
+      disabled={
+        trip.status === "Dispatched" ||
+        trip.status === "In Progress" ||
+        trip.status === "Completed"
+      }
+      className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:bg-gray-300"
+    >
+      Dispatch
+    </button>
+
+<Link
+  href={`/trips/${trip.id}`}
+  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+>
+  View
+</Link>
+
+<Link
+  href={`/trips/${trip.id}`}
+  className="rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700"
+>
+  Manifest
+</Link>
+
+<button
+  onClick={() => cancelTrip(trip.id)}
+  disabled={
+    trip.status === "Completed" ||
+    trip.status === "Cancelled"
+  }
+  className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-gray-300"
+>
+  Cancel
+</button>
+  </div>
+</td>
+            </td>
+          </tr>
+        ))}
+
+        {filteredTrips.length === 0 && (
+          <tr>
+            <td
+              colSpan={7}
+              className="p-8 text-center text-gray-500"
+            >
+              No trips found.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div className="mt-6 rounded-xl bg-white p-6 shadow">
+  <div className="flex flex-col gap-4 md:flex-row">
+    <input
+      type="text"
+      placeholder="🔍 Search Trip, Driver or Vehicle..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      className="flex-1 rounded-lg border p-3"
+    />
+
+    <select
+      value={statusFilter}
+      onChange={(e) => setStatusFilter(e.target.value)}
+      className="rounded-lg border p-3"
+    >
+      <option value="all">All Trips</option>
+      <option value="Assigned">Assigned</option>
+      <option value="Dispatched">Dispatched</option>
+      <option value="Accepted">Accepted</option>
+      <option value="In Progress">In Progress</option>
+      <option value="Completed">Completed</option>
+    </select>
+  </div>
+</div>
       </main>
     </AdminLayout>
   );

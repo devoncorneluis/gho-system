@@ -1,3 +1,5 @@
+import MetricCard from "../ui/MetricCard";
+
 type FleetDriver = {
   driver_locations: {
     updated_at: string | null;
@@ -11,48 +13,54 @@ type Props = {
   drivers: FleetDriver[];
   activeEmergencies: string[];
   isDriverOnline: (updatedAt: string | null | undefined) => boolean;
+
+  onlineDrivers: number;
+  offlineDrivers: number;
+  activeTrips: number;
+  availableDrivers: number;
+  gpsReporting: number;
+  fleetUtilization: number;
 };
 
 export default function FleetSummaryCards({
   drivers,
   activeEmergencies,
-  isDriverOnline,
+  onlineDrivers,
+  offlineDrivers,
+  activeTrips,
+  availableDrivers,
+  gpsReporting,
+  fleetUtilization,
 }: Props) {
-  const onlineDrivers = drivers.filter((driver) =>
-    isDriverOnline(driver.driver_locations?.[0]?.updated_at)
-  ).length;
-
-  const activeTrips = drivers.filter((driver) =>
-    driver.trips?.some(
-      (trip) =>
-        trip.trip_status !== "completed" &&
-        trip.trip_status !== "cancelled"
-    )
-  ).length;
-
   return (
-    <div className="mb-6 grid gap-4 md:grid-cols-4">
-      <div className="rounded-lg border bg-white p-4 shadow">
-        <p className="text-sm text-gray-500">Drivers</p>
-        <p className="text-3xl font-bold">{drivers.length}</p>
-      </div>
+    <div className="mb-6 grid gap-4 md:grid-cols-4 xl:grid-cols-8">
+<MetricCard label="Drivers" value={drivers.length} />
 
-      <div className="rounded-lg border bg-white p-4 shadow">
-        <p className="text-sm text-gray-500">Online</p>
-        <p className="text-3xl font-bold">{onlineDrivers}</p>
-      </div>
+<MetricCard label="Online" value={onlineDrivers} />
 
-      <div className="rounded-lg border bg-white p-4 shadow">
-        <p className="text-sm text-gray-500">Emergencies</p>
-        <p className="text-3xl font-bold">
-          {activeEmergencies.length}
-        </p>
-      </div>
+<MetricCard label="Offline" value={offlineDrivers} />
 
-      <div className="rounded-lg border bg-white p-4 shadow">
-        <p className="text-sm text-gray-500">Active Trips</p>
-        <p className="text-3xl font-bold">{activeTrips}</p>
-      </div>
+<MetricCard label="Active Trips" value={activeTrips} />
+
+      <MetricCard
+label="Emergencies"
+        value={activeEmergencies.length}
+      />
+
+      <MetricCard
+label="Available"
+        value={availableDrivers}
+      />
+
+      <MetricCard
+label="GPS Reporting"
+        value={gpsReporting}
+      />
+
+      <MetricCard
+label="Fleet Utilisation"
+        value={`${fleetUtilization}%`}
+      />
     </div>
   );
 }

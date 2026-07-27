@@ -53,12 +53,18 @@ const [showManifest, setShowManifest] = useState(false);
   const [email, setEmail] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
   const [pdpNumber, setPdpNumber] = useState("");
+  const [vehicleName, setVehicleName] = useState("");
+const [registrationNumber, setRegistrationNumber] = useState("");
+const [vehicleType, setVehicleType] = useState("");
+const [vehicleColour, setVehicleColour] = useState("");
+const [passengerLimit, setPassengerLimit] = useState("");
   const [assignedVehicleId, setAssignedVehicleId] = useState("");
   const [driverPhoto, setDriverPhoto] = useState("");
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [platformId, setPlatformId] = useState<string | null>(null);
 const [watchId, setWatchId] = useState<number | null>(null);
+
   async function loadDrivers() {
     if (!platformId) return;
 
@@ -158,10 +164,30 @@ return data.signedUrl;
     alert("Driver Name and Email Address are required");
     return;
   }
+const nextVehicleCode = `VEH-${String(vehicles.length + 1).padStart(4, "0")}`;
+const nextDriverCode = `DRV-${String(drivers.length + 1).padStart(4, "0")}`;
+const { data: newVehicle, error: vehicleError } = await supabase
+  .from("vehicles")
+.insert({
+  platform_id: platformId,
+  vehicle_code: nextVehicleCode,
+    vehicle_name: vehicleName,
+    registration_number: registrationNumber,
+    vehicle_type: vehicleType,
+    vehicle_colour: vehicleColour,
+    passenger_limit: Number(passengerLimit),
+    status: "Available",
+    availability_status: "Available",
+  })
+  .select()
+  .single();
 
-  const selectedVehicle = vehicles.find(
-    (vehicle) => vehicle.id === assignedVehicleId
-  );
+if (vehicleError) {
+  alert(vehicleError.message);
+  return;
+}
+
+
 
   let photoUrl = driverPhoto;
 
@@ -175,27 +201,32 @@ return data.signedUrl;
     photoUrl = uploaded;
   }
 
-  const { error } = await supabase.from("drivers").insert({
-    platform_id: platformId,
-    full_name: name,
-    phone,
-    email,
-    license_number: licenseNumber,
-    pdp_number: pdpNumber,
-    photo_url: photoUrl,
-    assigned_vehicle_id: assignedVehicleId || null,
-    assigned_vehicle: selectedVehicle
-      ? `${selectedVehicle.vehicle_code || "VEH"} - ${selectedVehicle.vehicle_name} - ${selectedVehicle.registration_number}`
-      : null,
-    status: "Available",
-    availability_status: "Available",
-  });
+const { error } = await supabase.from("drivers").insert({
+  platform_id: platformId,
+  driver_code: nextDriverCode,
+  full_name: name,
+  phone,
+  email,
+  license_number: licenseNumber,
+  pdp_number: pdpNumber,
+  photo_url: photoUrl,
+  assigned_vehicle_id: newVehicle.id,
+  assigned_vehicle: `${newVehicle.vehicle_name} - ${newVehicle.registration_number}`,
+  status: "Available",
+  availability_status: "Available",
+});
 
-  if (error) {
-    console.log("DRIVER SAVE ERROR", error);
-    alert(JSON.stringify(error, null, 2));
-    return;
-  }
+
+if (error) {
+  await supabase
+    .from("vehicles")
+    .delete()
+    .eq("id", newVehicle.id);
+
+  console.log("DRIVER SAVE ERROR", error);
+  alert(JSON.stringify(error, null, 2));
+  return;
+}
 
   try {
     await fetch("/api/create-driver-user", {
@@ -214,16 +245,22 @@ return data.signedUrl;
     console.error("Driver login creation failed", err);
   }
 
-  setDriverNo("");
-  setDriverCode("");
-  setName("");
-  setPhone("");
-  setEmail("");
-  setLicenseNumber("");
-  setPdpNumber("");
-  setAssignedVehicleId("");
-  setDriverPhoto("");
-  setSelectedPhoto(null);
+setDriverNo("");
+setDriverCode("");
+setName("");
+setPhone("");
+setEmail("");
+setLicenseNumber("");
+setPdpNumber("");
+
+setVehicleName("");
+setRegistrationNumber("");
+setVehicleType("");
+setVehicleColour("");
+setPassengerLimit("");
+
+setDriverPhoto("");
+setSelectedPhoto(null);
 
   loadDrivers();
 }
@@ -306,18 +343,22 @@ loadDrivers();
   return (
     <AdminLayout>
       <main className="min-h-screen bg-gray-100 p-6">
-        <h1 className="text-4xl font-bold text-[#061B33]">Drivers</h1>
+<h1 className="text-4xl font-bold text-[#061B33]">
+  Driver & Vehicle Management
+</h1>
 
-        <p className="text-gray-600 mt-2">
-          Add, edit, and assign vehicles to drivers.
-        </p>
+<p className="text-gray-600 mt-2">
+  Create and manage drivers together with their assigned vehicles from one place.
+</p>
 
         {editingDriver && (
           <div className="bg-white rounded-xl shadow p-6 mt-6 border-2 border-orange-500">
             <h2 className="text-2xl font-bold text-[#061B33] mb-4">
               Edit Driver: {editingDriver.full_name}
             </h2>
-
+<h3 className="text-lg font-bold text-[#061B33] border-b pb-2 mb-4">
+  👤 Driver Information
+</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input value={editingDriver.driver_no || ""} onChange={(e) => setEditingDriver({ ...editingDriver, driver_no: e.target.value })} className="border p-3 rounded-lg" placeholder="Driver Number" />
               <input value={editingDriver.driver_code || ""} onChange={(e) => setEditingDriver({ ...editingDriver, driver_code: e.target.value })} className="border p-3 rounded-lg" placeholder="Driver Code" />
@@ -463,7 +504,9 @@ onChange={(e) => {
         )}
 
         <div className="bg-white rounded-xl shadow p-6 mt-6">
-          <h2 className="text-xl font-bold mb-4">Add Driver</h2>
+<h2 className="text-xl font-bold mb-4">
+  Driver Information
+</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -502,23 +545,53 @@ onChange={(e) => {
                   className="mt-3 w-32 h-32 object-cover rounded-2xl border"
                 />
               )}
-              <select
-  value={assignedVehicleId}
-  onChange={(e) => setAssignedVehicleId(e.target.value)}
-  className="border p-3 rounded-lg mt-4"
->
-  <option value="">Select Vehicle</option>
-  {vehicles.map((vehicle) => (
-    <option key={vehicle.id} value={vehicle.id}>
-      {vehicle.vehicle_code || "VEH"} - {vehicle.vehicle_name} - {vehicle.registration_number}
-    </option>
-  ))}
-</select>
+              <h3 className="text-lg font-bold text-[#061B33] border-b pb-2 mt-6 mb-4">
+  🚐 Vehicle Information
+</h3>
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+
+  <input
+    value={vehicleName}
+    onChange={(e) => setVehicleName(e.target.value)}
+    className="border p-3 rounded-lg"
+    placeholder="Vehicle Name"
+  />
+
+  <input
+    value={registrationNumber}
+    onChange={(e) => setRegistrationNumber(e.target.value)}
+    className="border p-3 rounded-lg"
+    placeholder="Registration Number"
+  />
+
+  <input
+    value={vehicleType}
+    onChange={(e) => setVehicleType(e.target.value)}
+    className="border p-3 rounded-lg"
+    placeholder="Vehicle Type"
+  />
+
+  <input
+    value={vehicleColour}
+    onChange={(e) => setVehicleColour(e.target.value)}
+    className="border p-3 rounded-lg"
+    placeholder="Vehicle Colour"
+  />
+
+  <input
+    type="number"
+    value={passengerLimit}
+    onChange={(e) => setPassengerLimit(e.target.value)}
+    className="border p-3 rounded-lg"
+    placeholder="Passenger Capacity"
+  />
+
+</div>
             </div>
           </div>
 
           <button onClick={saveDriver} className="mt-6 bg-orange-500 text-white px-6 py-3 rounded-lg font-bold">
-            Save Driver
+Save Driver & Vehicle
           </button>
         </div>
 
@@ -639,12 +712,13 @@ onChange={(e) => {
           return;
         }
 
-        await startTrip(
-          supabase,
-          trip.id,
-          driver.id,
-          trip.vehicle_id
-        );
+await startTrip(
+  supabase,
+  trip.id,
+  platformId!,
+  driver.id,
+  trip.vehicle_id
+);
         if ("geolocation" in navigator) {
   const id = navigator.geolocation.watchPosition(
 async (position) => {
@@ -765,13 +839,17 @@ async (position) => {
         alert("No active trip assigned.");
         return;
       }
-
-      await completeTrip(
-        supabase,
-        trip.id,
-        driver.id,
-        trip.vehicle_id
-      );
+if (!platformId) {
+  alert("Platform not loaded.");
+  return;
+}
+await completeTrip(
+  supabase,
+  trip.id,
+  platformId,
+  driver.id,
+  trip.vehicle_id
+);
 if (watchId !== null) {
   navigator.geolocation.clearWatch(watchId);
   setWatchId(null);

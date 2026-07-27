@@ -1,4 +1,7 @@
 "use client";
+import FleetOperationsTimeline from "../../components/fleet/FleetOperationsTimeline";
+import FleetActivityFeed from "../../components/fleet/FleetActivityFeed";
+import FleetReassignModal from "../../components/fleet/FleetReassignModal";
 import FleetSearchBar from "../../components/fleet/FleetSearchBar";
 import Link from "next/link";
 import AdminLayout from "../../components/AdminLayout";
@@ -8,13 +11,16 @@ import FleetDriverRow from "../../components/fleet/FleetDriverRow";
 import { supabase } from "../../lib/supabase";
 import FleetSummaryCards from "../../components/fleet/FleetSummaryCards";
 import FleetStatusFilters from "../../components/fleet/FleetStatusFilters";
+import { getUserPlatform } from "../../lib/getUserPlatform";
 type FleetDriver = {
   id: string;
   full_name: string | null;
+  phone: string | null;
   status: string | null;
-  assigned_driver: {
-    vehicle_name: string | null;
-  }[] | null;
+assigned_driver: {
+  id: string;
+  vehicle_name: string | null;
+}[] | null;
 trips: {
   id: string;
   trip_code: string | null;
@@ -28,6 +34,7 @@ driver_locations: {
   updated_at: string | null;
 }[] | null;
 };
+
 type Passenger = {
   id: string;
   trip_id: string;
@@ -39,21 +46,58 @@ type Passenger = {
   pickup_status: string | null;
   pickup_order: number | null;
 };
+type AvailableDriver = {
+  id: string;
+  full_name: string | null;
+};
+
+type AvailableVehicle = {
+  id: string;
+  vehicle_name: string | null;
+};
+
 function isDriverOnline(updatedAt: string | null | undefined) {
   if (!updatedAt) return false;
 
   const lastUpdate = new Date(updatedAt).getTime();
   const now = Date.now();
 
-  // Consider the driver online if a GPS update was received
-  // within the last 5 minutes.
   return now - lastUpdate < 5 * 60 * 1000;
 }
+
+function getDriverHealth(
+  driver: FleetDriver,
+  activeEmergencies: string[]
+): "Healthy" | "Warning" | "Critical" {
+  if (activeEmergencies.includes(driver.id)) {
+    return "Critical";
+  }
+
+  const online = isDriverOnline(
+    driver.driver_locations?.[0]?.updated_at
+  );
+
+  if (!online) {
+    return "Warning";
+  }
+
+  return "Healthy";
+}
+
 export default function FleetCommandCentrePage() {
 const [search, setSearch] = useState("");
 const [selectedDriver, setSelectedDriver] =
   useState<FleetDriver | null>(null);
-
+const [fleetActivities, setFleetActivities] = useState<
+  {
+    id: string;
+    title: string;
+    time: string;
+    colour: "green" | "blue" | "yellow" | "red";
+  }[]
+>([]);
+  const [showReassignModal, setShowReassignModal] = useState(false);
+const [platformId, setPlatformId] = useState<string | null>(null);
     const [lastRefresh, setLastRefresh] = useState(new Date());
     const [timelineEvents, setTimelineEvents] = useState<
   {
@@ -63,7 +107,7 @@ const [selectedDriver, setSelectedDriver] =
     colour: "green" | "blue" | "yellow" | "red";
   }[]
 >([]);
-  const [fleetDrivers, setFleetDrivers] = useState<FleetDriver[]>([]);
+
 const [drivers, setDrivers] = useState<FleetDriver[]>([]);
 
 const [passengers, setPassengers] = useState<Passenger[]>([]);
@@ -71,22 +115,12 @@ const [activeEmergencies, setActiveEmergencies] = useState<string[]>([]);
 const [statusFilter, setStatusFilter] = useState<
   "all" | "online" | "offline" | "emergency" | "active"
 >("all");
-  useEffect(() => {
-    async function loadFleetDrivers() {
-      const { data, error } = await supabase.from("fleet_drivers").select("*");
-      if (error) {
-        alert(error.message);
-        return;
-      }
-      setFleetDrivers(data ?? []);
-    }
-    loadFleetDrivers();
-  }, []);
+
 
 
 async function loadEmergencies() {
   const { data, error } = await supabase
-    .from("emergencies")
+.from("emergency_alerts")
     .select("id");
 
   if (!error && data) {
@@ -94,39 +128,82 @@ async function loadEmergencies() {
   }
 }
 
-async function loadDrivers() {
+async function loadDrivers(): Promise<FleetDriver[]> {
   const { data, error } = await supabase
     .from("drivers")
     .select(`
       id,
       full_name,
+      phone,
       status,
       assigned_driver:vehicles (
+        id,
         vehicle_name
       ),
-trips (
-  id,
-  trip_code,
-  trip_status,
-  started_at,
-  completed_at
-),
-driver_locations (
-  latitude,
-  longitude,
-  updated_at
-)
+      trips (
+        id,
+        trip_code,
+        trip_status,
+        started_at,
+        completed_at
+      ),
+      driver_locations (
+        latitude,
+        longitude,
+        updated_at
+      )
     `)
     .order("full_name");
 
-  if (!error && data) {
-    setDrivers(data ?? []);
+  if (error) {
+    console.error(error);
+    return [];
   }
+
+  const loadedDrivers = (data ?? []) as FleetDriver[];
+
+  setDrivers(loadedDrivers);
+
+  return loadedDrivers;
 }
 
+async function refreshFleetData() {
+  const loadedDrivers = await loadDrivers();
 
+  await loadEmergencies();
 
+  setFleetActivities(
+    buildFleetActivities(loadedDrivers)
+  );
 
+  setLastRefresh(new Date());
+
+  if (selectedDriver) {
+    const refreshedDriver = loadedDrivers.find(
+      (driver) => driver.id === selectedDriver.id
+    );
+
+    if (refreshedDriver) {
+      setSelectedDriver(refreshedDriver);
+
+      const activeTrip = refreshedDriver.trips?.find(
+        (trip) =>
+          trip.trip_status !== "completed" &&
+          trip.trip_status !== "cancelled"
+      );
+
+      if (activeTrip) {
+        await loadPassengers(activeTrip.id);
+      } else {
+        setPassengers([]);
+      }
+
+      setTimelineEvents(
+        buildTimelineEvents(refreshedDriver)
+      );
+    }
+  }
+}
 async function loadPassengers(tripId: string) {
   const { data, error } = await supabase
     .from("trip_passengers")
@@ -166,26 +243,123 @@ function buildTimelineEvents(driver: FleetDriver) {
     events.push({
       id: "trip-active",
       title: "Active Trip",
-time: activeTrip.started_at
-  ? new Date(activeTrip.started_at).toLocaleTimeString()
-  : "Not started",
+      time: activeTrip.started_at
+        ? new Date(activeTrip.started_at).toLocaleTimeString()
+        : "Not started",
+      colour: "green",
+    });
+  }
+
+  if (driver.driver_locations?.[0]?.updated_at) {
+    events.push({
+      id: "gps-update",
+      title: "GPS Position Updated",
+      time: new Date(
+        driver.driver_locations[0].updated_at
+      ).toLocaleTimeString(),
+      colour: "blue",
+    });
+  }
+
+  if (activeEmergencies.includes(driver.id)) {
+    events.push({
+      id: "emergency",
+      title: "Emergency Alert Active",
+      time: new Date().toLocaleTimeString(),
+      colour: "red",
+    });
+  }
+
+  const completedTrip = driver.trips?.find(
+    (trip) => trip.completed_at
+  );
+
+  if (completedTrip?.completed_at) {
+    events.push({
+      id: "trip-completed",
+      title: "Trip Completed",
+      time: new Date(
+        completedTrip.completed_at
+      ).toLocaleTimeString(),
       colour: "green",
     });
   }
 
   return events;
 }
-  async function handleDriverSelect(driver: FleetDriver) {
+
+function buildFleetActivities(drivers: FleetDriver[]) {
+  const activities: {
+    id: string;
+    title: string;
+    time: string;
+    colour: "green" | "blue" | "yellow" | "red";
+  }[] = [];
+
+  drivers.forEach((driver) => {
+    const activeTrip = driver.trips?.find(
+      (trip) =>
+        trip.trip_status !== "completed" &&
+        trip.trip_status !== "cancelled"
+    );
+
+    if (activeTrip) {
+      activities.push({
+        id: `${driver.id}-trip`,
+        title: `${driver.full_name} is operating ${activeTrip.trip_code}`,
+        time: activeTrip.started_at
+          ? new Date(activeTrip.started_at).toLocaleTimeString()
+          : "Now",
+        colour: "green",
+      });
+    }
+
+    if (driver.driver_locations?.[0]?.updated_at) {
+      activities.push({
+        id: `${driver.id}-gps`,
+        title: `${driver.full_name} GPS updated`,
+        time: new Date(
+          driver.driver_locations[0].updated_at
+        ).toLocaleTimeString(),
+        colour: "blue",
+      });
+    }
+
+    if (activeEmergencies.includes(driver.id)) {
+      activities.push({
+        id: `${driver.id}-emergency`,
+        title: `${driver.full_name} emergency active`,
+        time: new Date().toLocaleTimeString(),
+        colour: "red",
+      });
+    }
+  });
+
+  return activities.sort(
+    (a, b) =>
+      new Date(`1970/01/01 ${b.time}`).getTime() -
+      new Date(`1970/01/01 ${a.time}`).getTime()
+  );
+
+  // return events; // This line is unnecessary and should be removed
+}
+async function handleDriverSelect(driver: FleetDriver) {
   setSelectedDriver(driver);
 
-const events = buildTimelineEvents(driver);
-
-const activeTrip = driver.trips?.find(
-  (trip) =>
-    trip.trip_status !== "completed" &&
-    trip.trip_status !== "cancelled"
-);
+  const events = buildTimelineEvents(driver);
   setTimelineEvents(events);
+
+  const activeTrip = driver.trips?.find(
+    (trip) =>
+      trip.trip_status !== "completed" &&
+      trip.trip_status !== "cancelled"
+  );
+
+  if (activeTrip) {
+    await loadPassengers(activeTrip.id);
+  } else {
+    setPassengers([]);
+  }
 }
 const filteredDrivers = drivers.filter((driver) => {
   const text = search.trim().toLowerCase();
@@ -222,14 +396,48 @@ const filteredDrivers = drivers.filter((driver) => {
       return true;
   }
 });
+const onlineDrivers = filteredDrivers.filter((driver) =>
+  isDriverOnline(driver.driver_locations?.[0]?.updated_at)
+).length;
+
+const offlineDrivers = filteredDrivers.length - onlineDrivers;
+
+const activeTrips = filteredDrivers.filter((driver) =>
+  driver.trips?.some(
+    (trip) =>
+      trip.trip_status !== "completed" &&
+      trip.trip_status !== "cancelled"
+  )
+).length;
+
+const availableDrivers = filteredDrivers.filter(
+  (driver) => driver.status === "Available"
+).length;
+
+const gpsReporting = filteredDrivers.filter(
+  (driver) => (driver.driver_locations?.length ?? 0) > 0
+).length;
+
+const fleetUtilization =
+  filteredDrivers.length === 0
+    ? 0
+    : Math.round((activeTrips / filteredDrivers.length) * 100);
 
 useEffect(() => {
   async function refreshDashboard() {
-    await Promise.all([
-      loadDrivers(),
-      loadEmergencies(),
-    ]);
+    const userPlatform = await getUserPlatform();
 
+    if (userPlatform) {
+      setPlatformId(userPlatform.platformId);
+    }
+
+const loadedDrivers = await loadDrivers();
+
+await loadEmergencies();
+
+setFleetActivities(
+  buildFleetActivities(loadedDrivers)
+);
     setLastRefresh(new Date());
   }
 
@@ -257,6 +465,16 @@ return (
   drivers={drivers}
   activeEmergencies={activeEmergencies}
   isDriverOnline={isDriverOnline}
+  onlineDrivers={onlineDrivers}
+  offlineDrivers={offlineDrivers}
+  activeTrips={activeTrips}
+  availableDrivers={availableDrivers}
+  gpsReporting={gpsReporting}
+  fleetUtilization={fleetUtilization}
+/>
+<FleetReassignModal
+  open={showReassignModal}
+  onClose={() => setShowReassignModal(false)}
 />
 
 
@@ -291,12 +509,13 @@ return (
 <th className="px-4 py-3 text-left">
   Longitude
 </th>
-              <th className="px-4 py-3 text-left">Latitude</th>
-<th className="px-4 py-3 text-left">Longitude</th>
+
+
               <th className="px-4 py-3 text-left">Emergency</th>
               <th className="px-4 py-3 text-left">Trip Status</th>
-              <th className="px-4 py-3 text-left">Online</th>
-              <th className="px-4 py-3 text-left">Quick Actions</th>
+<th className="px-4 py-3 text-left">Online</th>
+<th className="px-4 py-3 text-left">Health</th>
+<th className="px-4 py-3 text-left">Quick Actions</th>
             </tr>
           </thead>
 
@@ -304,7 +523,7 @@ return (
             {filteredDrivers.length === 0 ? (
               <tr>
                 <td
-                  colSpan={9}
+colSpan={12}
                   className="px-4 py-12 text-center text-gray-500"
                 >
                   No drivers found.
@@ -312,13 +531,14 @@ return (
               </tr>
             ) : (
 filteredDrivers.map((driver) => (
-  <FleetDriverRow
-    key={driver.id}
-    driver={driver}
-    activeEmergencies={activeEmergencies}
-    isDriverOnline={isDriverOnline}
-onSelect={() => handleDriverSelect(driver)}
-  />
+<FleetDriverRow
+  key={driver.id}
+  driver={driver}
+  activeEmergencies={activeEmergencies}
+  isDriverOnline={isDriverOnline}
+  health={getDriverHealth(driver, activeEmergencies)}
+  onSelect={() => handleDriverSelect(driver)}
+/>
 ))
             )}
           </tbody>
@@ -326,9 +546,19 @@ onSelect={() => handleDriverSelect(driver)}
       </div>
 <FleetDriverDetail
   selectedDriver={selectedDriver}
+  platformId={platformId}
   activeEmergencies={activeEmergencies}
   passengers={passengers}
-  onClose={() => setSelectedDriver(null)}
+  onRefresh={refreshFleetData}
+  onOpenReassign={() => setShowReassignModal(true)}
+  onClose={() => {
+    setSelectedDriver(null);
+    setPassengers([]);
+  }}
+/>
+<FleetOperationsTimeline events={timelineEvents} />
+<FleetActivityFeed
+  activities={fleetActivities}
 />
     </main>
   </AdminLayout>

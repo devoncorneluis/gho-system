@@ -15,16 +15,11 @@ type EmergencyAlert = { id: string; status: string | null };
 type Vehicle = { id: string; status: string | null };
 
 const menuItems = [
-{ name: "Daily Planner", icon: "🚐", href: "/admin-planner" },
+  { name: "Daily Planner", icon: "📅", href: "/admin-planner" },
+  { name: "Driver & Vehicle Management", icon: "🚐", href: "/drivers" },
+  { name: "Agents", icon: "👥", href: "/agents" },
   { name: "Trips", icon: "🚐", href: "/trips" },
   { name: "Route Playback", icon: "🛰️", href: "/route-playback" },
-  { name: "Agents", icon: "👥", href: "/agents" },
-  { name: "Drivers", icon: "🚗", href: "/drivers" },
-  { name: "Vehicles", icon: "🚙", href: "/vehicles" },
-  { name: "Live Map", icon: "📍", href: "/live-map" },
-  { name: "Emergency", icon: "🚨", href: "/emergency-dashboard" },
-  { name: "Notifications", icon: "🔔", href: "/notifications" },
-  { name: "Reports", icon: "📊", href: "/reports" },
 ];
 
 function StatCard({
@@ -112,16 +107,17 @@ export default function AdminPage() {
         <section className="rounded-3xl bg-[#061B33] text-white p-8 shadow-xl">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <p className="text-orange-400 font-bold tracking-wide uppercase">
-                Corneluis Group Pty Ltd
-              </p>
-              <h1 className="text-4xl md:text-5xl font-black mt-2">
-                GHO Command Center
-              </h1>
-              <p className="text-gray-300 mt-3 max-w-2xl">
-                Global Handling Operations live control dashboard for fleet,
-                drivers, passengers, trips, and emergency response.
-              </p>
+<p className="text-orange-400 font-bold tracking-wide uppercase">
+  Platform Administration
+</p>
+<h1 className="text-4xl md:text-5xl font-black mt-2">
+  Platform Admin Portal
+</h1>
+<p className="text-gray-300 mt-3 max-w-2xl">
+  Manage your company's transport operations, daily planning,
+  driver &amp; vehicle management, passenger movements and
+  operational reporting.
+</p>
             </div>
 
             <div className="bg-white/10 rounded-2xl p-5 border border-white/10">
@@ -175,7 +171,7 @@ export default function AdminPage() {
 
         <section className="mt-8">
           <h2 className="text-2xl font-black text-[#061B33]">
-            Operations Quick Access
+Platform Operations
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">

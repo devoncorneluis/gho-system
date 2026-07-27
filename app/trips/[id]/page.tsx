@@ -1,8 +1,14 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { supabase } from "../../../lib/supabase";
 
+
+import { supabase } from "../../../lib/supabase";
+import TripTimeline, {
+  TimelineEvent,
+} from "../../../components/timeline/TripTimeline";
+import { loadTripTimeline } from "../../../lib/loadTripTimeline";
+import { recordTripEvent } from "../../../lib/tripEventService";
 type Trip = {
   id: string;
   platform_id: string | null;
@@ -57,7 +63,7 @@ export default function TripDetailPage({
 
   const [trip, setTrip] = useState<Trip | null>(null);
   const [passengers, setPassengers] = useState<Passenger[]>([]);
-
+const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [showTicketModal, setShowTicketModal] = useState(false);
 
   const [ticketSubject, setTicketSubject] = useState("");
@@ -71,9 +77,16 @@ export default function TripDetailPage({
       .eq("id", id)
       .single();
 
-    if (data) {
-      setTrip(data);
-    }
+if (data) {
+  setTrip(data);
+
+  const timelineData = await loadTripTimeline(
+    supabase,
+    data.id
+  );
+
+  setTimeline(timelineData);
+}
 
     const { data: passengerData } = await supabase
       .from("trip_passengers")
@@ -130,7 +143,18 @@ export default function TripDetailPage({
       alert(error.message);
       return;
     }
-
+await recordTripEvent({
+  tripId: trip.id,
+  platformId: trip.platform_id,
+  createdBy: trip.driver_id,
+  eventType: "trip_started",
+  eventData: {
+    description: `${trip.trip_code} was started.`,
+    tripCode: trip.trip_code,
+    driverName: trip.driver_name,
+    vehicleName: trip.vehicle_name,
+  },
+});
     if (trip.driver_id) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -188,7 +212,18 @@ export default function TripDetailPage({
       alert(error.message);
       return;
     }
-
+await recordTripEvent({
+  tripId: trip.id,
+  platformId: trip.platform_id,
+  createdBy: trip.driver_id,
+  eventType: "trip_completed",
+  eventData: {
+    description: `${trip.trip_code} was completed.`,
+    tripCode: trip.trip_code,
+    driverName: trip.driver_name,
+    vehicleName: trip.vehicle_name,
+  },
+});
     await supabase
       .from("trip_passengers")
       .update({
@@ -224,7 +259,41 @@ export default function TripDetailPage({
 
     alert("Trip completed successfully.");
   }
+async function cancelTrip() {
+  if (!trip) return;
 
+  if (!confirm("Cancel this trip?")) return;
+
+  const { error } = await supabase
+    .from("trips")
+    .update({
+      status: "Cancelled",
+    })
+    .eq("id", trip.id)
+    .eq("platform_id", trip.platform_id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await recordTripEvent({
+    tripId: trip.id,
+    platformId: trip.platform_id,
+    createdBy: trip.driver_id,
+    eventType: "trip_cancelled",
+    eventData: {
+      description: `${trip.trip_code} was cancelled.`,
+      tripCode: trip.trip_code,
+      driverName: trip.driver_name,
+      vehicleName: trip.vehicle_name,
+    },
+  });
+
+  await loadTrip();
+
+  alert("Trip cancelled.");
+}
   async function createSupportTicket() {
     if (!trip) return;
 
@@ -277,7 +346,19 @@ export default function TripDetailPage({
       alert(error.message);
       return;
     }
-
+await recordTripEvent({
+  tripId: trip.id,
+  platformId: trip.platform_id,
+  createdBy: trip.driver_id,
+  eventType: "emergency_raised",
+  eventData: {
+    description: `Emergency raised for ${trip.trip_code}.`,
+    tripCode: trip.trip_code,
+    driverName: trip.driver_name,
+    vehicleName: trip.vehicle_name,
+    alertType: "Emergency",
+  },
+});
     alert("Emergency alert sent successfully.");
   }
 
@@ -306,7 +387,6 @@ export default function TripDetailPage({
         <h1 className="text-3xl font-bold text-[#061B33]">
           {trip.trip_code}
         </h1>
-
         <div className="grid md:grid-cols-2 gap-4 mt-4">
           <p><strong>Date:</strong> {trip.trip_date}</p>
           <p><strong>Shift:</strong> {trip.shift}</p>
@@ -323,6 +403,9 @@ export default function TripDetailPage({
               : "Not set"}
           </p>
         </div>
+        <div className="mt-6">
+  <TripTimeline events={timeline} />
+</div>
       </div>
 
       <div className="bg-white rounded-xl shadow p-6 mt-6">
@@ -354,7 +437,13 @@ export default function TripDetailPage({
           >
             Complete Trip
           </button>
-
+<button
+  onClick={cancelTrip}
+  disabled={trip.status === "Completed"}
+  className="bg-gray-700 text-white rounded-xl p-3 font-bold disabled:bg-gray-400"
+>
+  Cancel Trip
+</button>
           <button
             onClick={() =>
               window.location.href = `/live-map?trip=${trip.id}`

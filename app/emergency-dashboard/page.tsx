@@ -22,6 +22,9 @@ type EmergencyAlert = {
   acknowledged_at: string | null;
   resolved_at: string | null;
   resolution_notes: string | null;
+
+latitude: number | null;
+longitude: number | null;
 };
 
 export default function EmergencyDashboardPage() {
@@ -104,13 +107,28 @@ export default function EmergencyDashboardPage() {
     loadAlerts();
   }
 
-  useEffect(() => {
-    loadAlerts();
+useEffect(() => {
+  loadAlerts();
 
-    const timer = setInterval(loadAlerts, 10000);
+  const channel = supabase
+    .channel("emergency-alerts")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "emergency_alerts",
+      },
+      () => {
+        loadAlerts();
+      }
+    )
+    .subscribe();
 
-    return () => clearInterval(timer);
-  }, []);
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
 
   const openAlerts = alerts.filter((alert) => alert.status === "Open");
   const acknowledgedAlerts = alerts.filter(
@@ -216,6 +234,33 @@ export default function EmergencyDashboardPage() {
                   <p className="bg-gray-50 rounded-lg p-3 mt-1">
                     {alert.description || "No description provided"}
                   </p>
+                  <div className="mt-4 rounded-lg border bg-blue-50 p-3">
+  <p className="font-bold text-[#061B33]">📍 Incident Location</p>
+
+  <p>
+    <strong>Latitude:</strong>{" "}
+    {alert.latitude ?? "Unavailable"}
+  </p>
+
+  <p>
+    <strong>Longitude:</strong>{" "}
+    {alert.longitude ?? "Unavailable"}
+  </p>
+
+  {alert.latitude !== null && alert.longitude !== null && (
+    <button
+      onClick={() =>
+        window.open(
+          `https://www.google.com/maps?q=${alert.latitude},${alert.longitude}`,
+          "_blank"
+        )
+      }
+      className="mt-3 rounded-lg bg-[#061B33] px-4 py-2 font-bold text-white hover:bg-blue-700"
+    >
+      🌍 Open in Google Maps
+    </button>
+  )}
+</div>
                 </div>
               </div>
 
