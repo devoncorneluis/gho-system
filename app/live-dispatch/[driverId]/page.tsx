@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import AdminLayout from "../../../components/AdminLayout";
 import DriverTimeline from "../../../components/fleet/DriverTimeline";
+import { getUserPlatform } from "../../../lib/getUserPlatform";
 import { supabase } from "../../../lib/supabase";
 
 type Driver = {
@@ -47,15 +48,30 @@ export default function DriverCommandPage({ params }: Props) {
   const [driver, setDriver] = useState<Driver | null>(null);
   const [trip, setTrip] = useState<Trip | null>(null);
   const [passengers, setPassengers] = useState<Passenger[]>([]);
+  const [platformId, setPlatformId] = useState<string | null>(null);
 
-  const demoTimeline = [
-    { id: "1", title: "🟢 Driver Logged In", time: "08:00" },
-    { id: "2", title: "🚐 Trip Started", time: "08:06" },
-    { id: "3", title: "👤 Passenger Picked Up", time: "08:18" },
-  ];
+  useEffect(() => {
+    async function setupPage() {
+      const userPlatform = await getUserPlatform();
+      if (!userPlatform) {
+        window.location.href = "/login";
+        return;
+      }
+      setPlatformId(userPlatform.platformId);
+    }
+
+    setupPage();
+  }, []);
 
   const loadDriver = useCallback(async () => {
-    const { data, error } = await supabase.from("drivers").select("*").eq("id", driverId).single();
+    if (!platformId) return;
+
+    const { data, error } = await supabase
+      .from("drivers")
+      .select("*")
+      .eq("platform_id", platformId)
+      .eq("id", driverId)
+      .single();
 
     if (error) {
       console.error(error.message);
@@ -63,14 +79,15 @@ export default function DriverCommandPage({ params }: Props) {
     }
 
     setDriver(data);
-  }, [driverId]);
+  }, [driverId, platformId]);
 
   const loadCurrentTrip = useCallback(async () => {
-    if (!driver?.full_name) return;
+    if (!driver?.full_name || !platformId) return;
 
     const { data, error } = await supabase
       .from("trips")
       .select("*")
+      .eq("platform_id", platformId)
       .eq("driver_name", driver?.full_name)
       .in("status", ["Assigned", "In Progress"])
       .limit(1)
@@ -82,14 +99,15 @@ export default function DriverCommandPage({ params }: Props) {
     }
 
     setTrip(data);
-  }, [driver?.full_name]);
+  }, [driver?.full_name, platformId]);
 
   const loadPassengers = useCallback(async () => {
-    if (!trip?.id) return;
+    if (!trip || !platformId) return;
 
     const { data, error } = await supabase
       .from("trip_passengers")
       .select("id, full_name, pickup_status, pickup_area, pickup_time")
+      .eq("platform_id", platformId)
       .eq("trip_id", trip.id)
       .order("pickup_time");
 
@@ -99,17 +117,20 @@ export default function DriverCommandPage({ params }: Props) {
     }
 
     setPassengers(data || []);
-  }, [trip?.id]);
+  }, [trip, platformId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDriver();
   }, [loadDriver]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCurrentTrip();
   }, [loadCurrentTrip]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPassengers();
   }, [loadPassengers]);
 

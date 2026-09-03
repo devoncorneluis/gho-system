@@ -1,6 +1,7 @@
 "use client";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-import { useEffect, useState } from "react";
 import { APIProvider, Map, Marker, Polyline } from "@vis.gl/react-google-maps";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
@@ -17,28 +18,39 @@ type LocationHistory = {
   trip_id: string | null;
   recorded_at: string | null;
 };
-async function loadTripDetails(tripId: string, setTripDetails: (data: any) => void) {
+type TripDetails = {
+  id: string;
+  trip_code: string | null;
+  trip_date: string | null;
+  shift: string | null;
+  status: string | null;
+  driver_name: string | null;
+  vehicle_name: string | null;
+  passenger_count: number | null;
+  distance_km: number | null;
+};
+
+async function loadTripDetails(
+  tripId: string,
+  setTripDetails: (data: TripDetails | null) => void
+) {
   const { data } = await supabase
     .from("trips")
     .select("*")
     .eq("id", tripId)
     .single();
 
-  setTripDetails(data);
+  setTripDetails((data as TripDetails | null) ?? null);
 }
-export default function RoutePlaybackPage() {
+function RoutePlaybackContent() {
   const [platformId, setPlatformId] = useState<string | null>(null);
   const [history, setHistory] = useState<LocationHistory[]>([]);
 const [selectedTrip, setSelectedTrip] = useState("");
-const [tripDetails, setTripDetails] = useState<any>(null);
+  const [tripDetails, setTripDetails] = useState<TripDetails | null>(null);
   const [playIndex, setPlayIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-
-useEffect(() => {
-  if (platformId) {
-    loadHistory();
-  }
-}, [platformId]);
+const searchParams = useSearchParams();
+const selectedDriver = searchParams.get("driver");
 
 
 
@@ -59,15 +71,21 @@ useEffect(() => {
 }, []);
 
 
-async function loadHistory() {
+const loadHistory = useCallback(async () => {
   if (!platformId) return;
 
-  const { data, error } = await supabase
-    .from("driver_location_history")
-    .select("*")
-    .eq("platform_id", platformId)
-    .order("recorded_at", { ascending: false })
-    .limit(50);
+let query = supabase
+  .from("driver_location_history")
+  .select("*")
+  .eq("platform_id", platformId);
+
+if (selectedDriver) {
+  query = query.eq("driver_id", selectedDriver);
+}
+
+const { data, error } = await query
+  .order("recorded_at", { ascending: false })
+  .limit(50);
 
   if (error) {
     alert(error.message);
@@ -75,13 +93,12 @@ async function loadHistory() {
   }
 
   setHistory((data || []).reverse());
-}
+}, [platformId, selectedDriver]);
 
 useEffect(() => {
-  if (platformId) {
-    loadHistory();
-  }
-}, [platformId]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  void loadHistory();
+}, [loadHistory]);
 
 const trips = Array.from(
   new Set(history.map((item) => item.trip_id).filter(Boolean))
@@ -372,6 +389,12 @@ onChange={async (e) => {
     </AdminLayout>
   );
 }
-
+export default function RoutePlaybackPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading route playback...</div>}>
+      <RoutePlaybackContent />
+    </Suspense>
+  );
+}
 
 

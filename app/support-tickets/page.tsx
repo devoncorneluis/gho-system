@@ -1,39 +1,62 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { getUserPlatform } from "@/lib/getUserPlatform";
 import { supabase } from "@/lib/supabase";
 
-export default function SupportTicketsPage() {
-  const [tickets, setTickets] = useState<any[]>([]);
+type SupportTicket = {
+  id: string;
+  trip_id: string | null;
+  trip_code: string | null;
+  driver_name: string | null;
+  vehicle_name: string | null;
+  vehicle_registration: string | null;
+  priority: string | null;
+  message: string | null;
+  status: string | null;
+};
 
-  const loadTickets = async () => {
+export default function SupportTicketsPage() {
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [platformId, setPlatformId] = useState<string | null>(null);
+
+  const loadTickets = useCallback(async () => {
+    if (!platformId) return;
+
     const { data } = await supabase
       .from("support_tickets")
       .select("*")
+      .eq("platform_id", platformId)
       .order("created_at", { ascending: false });
 
-    setTickets(data || []);
-  };
+    setTickets(((data as SupportTicket[] | null) ?? []));
+  }, [platformId]);
 
   const resolveTicket = async (id: string) => {
+    if (!platformId) return;
+
     await supabase
       .from("support_tickets")
       .update({
         status: "Resolved",
         resolved_at: new Date().toISOString(),
       })
+      .eq("platform_id", platformId)
       .eq("id", id);
 
     loadTickets();
   };
 
-  const escalateToEmergency = async (ticket: any) => {
+  const escalateToEmergency = async (ticket: SupportTicket) => {
+    if (!platformId) return;
+
     const confirmEscalate = confirm("Escalate this support ticket to emergency?");
     if (!confirmEscalate) return;
 
     const { data: existingEmergency } = await supabase
       .from("emergency_alerts")
       .select("id")
+      .eq("platform_id", platformId)
       .eq("trip_id", ticket.trip_id)
       .eq("status", "Open")
       .maybeSingle();
@@ -44,6 +67,7 @@ export default function SupportTicketsPage() {
     }
 
     const { error } = await supabase.from("emergency_alerts").insert({
+      platform_id: platformId,
       trip_id: ticket.trip_id || null,
       trip_code: ticket.trip_code || null,
       driver_name: ticket.driver_name || null,
@@ -63,14 +87,29 @@ export default function SupportTicketsPage() {
     await supabase
       .from("support_tickets")
       .update({ status: "Escalated" })
+      .eq("platform_id", platformId)
       .eq("id", ticket.id);
 
     loadTickets();
   };
 
   useEffect(() => {
-    loadTickets();
+    async function setupPage() {
+      const userPlatform = await getUserPlatform();
+      if (!userPlatform) {
+        window.location.href = "/login";
+        return;
+      }
+      setPlatformId(userPlatform.platformId);
+    }
+
+    setupPage();
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadTickets();
+  }, [loadTickets]);
 
   return (
     <main className="p-6">

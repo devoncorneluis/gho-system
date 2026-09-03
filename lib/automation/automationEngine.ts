@@ -1,4 +1,4 @@
-import type { AutomationEscalation, AutomationEvent, AutomationNotification, AutomationPriority, AutomationSeverity } from "../../types/automation";
+import type { AutomationEscalation, AutomationEvent, AutomationNotification } from "../../types/automation";
 import { detectDelay } from "../intelligence/delayDetector";
 import { assessTripRisk } from "../intelligence/riskEngine";
 import { buildSlaSummary } from "../intelligence/slaEngine";
@@ -22,13 +22,6 @@ function toIso(value?: string | null): string | undefined {
   if (!value) return undefined;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
-}
-
-function toSeverityFromPriority(priority: AutomationPriority): AutomationSeverity {
-  if (priority === "p1") return "critical";
-  if (priority === "p2") return "high";
-  if (priority === "p3") return "medium";
-  return "low";
 }
 
 function convertEscalations(decisions: ReturnType<typeof runEscalationEngine>): AutomationEscalation[] {

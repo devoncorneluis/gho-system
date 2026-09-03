@@ -37,6 +37,7 @@ export default function AgentPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTrips();
   }, []);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
@@ -52,13 +52,8 @@ setCurrentUserId(user?.id ?? null);
     loadPlatform();
   }, []);
 
-  useEffect(() => {
+  const loadTrips = useCallback(async () => {
     if (!platformId) return;
-
-    loadTrips();
-  }, [platformId]);
-
-  async function loadTrips() {
     setLoading(true);
 
     const { data, error } = await supabase
@@ -85,7 +80,14 @@ setCurrentUserId(user?.id ?? null);
     }
 
     setLoading(false);
-  }
+  }, [platformId]);
+
+  useEffect(() => {
+    if (!platformId) return;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadTrips();
+  }, [platformId, loadTrips]);
 async function loadPassengerPreview(tripId: string) {
   const { data } = await supabase
     .from("trip_passengers")
@@ -135,7 +137,7 @@ useEffect(() => {
         filter: `platform_id=eq.${platformId}`,
       },
       () => {
-        loadTrips();
+        void loadTrips();
       }
     )
     .subscribe();
@@ -143,7 +145,7 @@ useEffect(() => {
   return () => {
     supabase.removeChannel(channel);
   };
-}, [platformId]);
+}, [platformId, loadTrips]);
 
 
 
@@ -324,7 +326,7 @@ function getStatusBadge(status: string | null) {
 </section>
           <div className="border-b px-6 py-4">
             <h2 className="text-2xl font-black text-[#061B33]">
-              Today's Trips
+              Today&apos;s Trips
             </h2>
           </div>
 

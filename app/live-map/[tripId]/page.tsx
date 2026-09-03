@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import {
   APIProvider,
@@ -61,7 +61,7 @@ export default function TripLiveMapPage({
   const [driverLocation, setDriverLocation] =
     useState<DriverLocation | null>(null);
 const [passengers, setPassengers] = useState<Passenger[]>([]);
-  async function loadDriverLocation(driverId: string) {
+  const loadDriverLocation = useCallback(async (driverId: string) => {
     const { data, error } = await supabase
       .from("driver_locations")
       .select("*")
@@ -73,8 +73,8 @@ const [passengers, setPassengers] = useState<Passenger[]>([]);
     if (!error && data) {
       setDriverLocation(data);
     }
-  }
-async function loadPassengers(tripId: string) {
+  }, []);
+const loadPassengers = useCallback(async (tripId: string) => {
 const { data, error } = await supabase
   .from("trip_passengers")
   .select(`
@@ -94,8 +94,8 @@ const { data, error } = await supabase
   }
 
   setPassengers(data || []);
-}
-  async function loadDriver(driverId: string) {
+}, []);
+  const loadDriver = useCallback(async (driverId: string) => {
     const { data, error } = await supabase
       .from("drivers")
       .select("*")
@@ -107,9 +107,9 @@ const { data, error } = await supabase
     setDriver(data);
 
     await loadDriverLocation(driverId);
-  }
+  }, [loadDriverLocation]);
 
-  async function loadTrip() {
+  const loadTrip = useCallback(async () => {
     const { data, error } = await supabase
       .from("trips")
       .select("*")
@@ -128,9 +128,10 @@ await loadPassengers(data.id);
 if (data.driver_id) {
   await loadDriver(data.driver_id);
 }
-  }
+  }, [loadDriver, loadPassengers, tripId]);
 
 useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   loadTrip();
 
   const timer = setInterval(() => {
@@ -138,7 +139,7 @@ useEffect(() => {
   }, 10000);
 
   return () => clearInterval(timer);
-}, []);
+}, [loadTrip]);
 
   return (
         <main className="min-h-screen bg-gray-100 p-6">

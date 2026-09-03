@@ -6,6 +6,15 @@ import { calculateAverageOccupancy, calculateTripSuccessRate } from "../../lib/a
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import { supabase } from "../../lib/supabase";
 
+type TripMetricRow = {
+  status: string | null;
+  passenger_count: number | null;
+};
+
+type VehicleMetricRow = {
+  status: string | null;
+};
+
 export default function KpiDashboard() {
   const [metrics, setMetrics] = useState({ successRate: 0, utilization: 0, occupancy: 0 });
 
@@ -23,9 +32,13 @@ export default function KpiDashboard() {
         ]);
 
         if (!mounted) return;
-        const tripMetrics = (trips || []).map((trip: any) => ({ status: trip.status, passengerCount: trip.passenger_count }));
-        const availableVehicles = (vehicles || []).filter((vehicle: any) => vehicle.status === "Available").length;
-        const totalVehicles = (vehicles || []).length;
+        const tripMetrics = ((trips as TripMetricRow[] | null) || []).map((trip) => ({
+          status: trip.status ?? "Unknown",
+          passengerCount: trip.passenger_count ?? undefined,
+        }));
+        const vehicleRows = (vehicles as VehicleMetricRow[] | null) || [];
+        const availableVehicles = vehicleRows.filter((vehicle) => vehicle.status === "Available").length;
+        const totalVehicles = vehicleRows.length;
 
         setMetrics({
           successRate: calculateTripSuccessRate(tripMetrics),

@@ -11,7 +11,8 @@ export async function reassignTrip(
   newDriverName: string,
 
   newVehicleId: string,
-  newVehicleName: string
+  newVehicleName: string,
+  platformId?: string
 ) {
   // Basic validation
   if (!tripId) {
@@ -40,7 +41,7 @@ if (!newDriverName.trim()) {
 if (!newVehicleName.trim()) {
   throw new Error("New vehicle name is required.");
 }
-const { error: tripError } = await supabase
+let tripMutation = supabase
   .from("trips")
   .update({
     driver_id: newDriverId,
@@ -50,11 +51,17 @@ const { error: tripError } = await supabase
   })
   .eq("id", tripId);
 
+if (platformId) {
+  tripMutation = tripMutation.eq("platform_id", platformId);
+}
+
+const { error: tripError } = await tripMutation;
+
 if (tripError) {
   throw tripError;
 }
 
-const { error: oldDriverError } = await supabase
+let oldDriverMutation = supabase
   .from("drivers")
   .update({
     status: "Available",
@@ -64,11 +71,17 @@ const { error: oldDriverError } = await supabase
   })
   .eq("id", oldDriverId);
 
+if (platformId) {
+  oldDriverMutation = oldDriverMutation.eq("platform_id", platformId);
+}
+
+const { error: oldDriverError } = await oldDriverMutation;
+
 if (oldDriverError) {
   throw oldDriverError;
 }
 
-const { error: oldVehicleError } = await supabase
+let oldVehicleMutation = supabase
   .from("vehicles")
   .update({
     availability_status: "Available",
@@ -76,11 +89,17 @@ const { error: oldVehicleError } = await supabase
   })
   .eq("id", oldVehicleId);
 
+if (platformId) {
+  oldVehicleMutation = oldVehicleMutation.eq("platform_id", platformId);
+}
+
+const { error: oldVehicleError } = await oldVehicleMutation;
+
 if (oldVehicleError) {
   throw oldVehicleError;
 }
 
-const { error: newDriverError } = await supabase
+let newDriverMutation = supabase
   .from("drivers")
   .update({
     status: "Assigned",
@@ -89,6 +108,12 @@ const { error: newDriverError } = await supabase
     assigned_vehicle_id: newVehicleId,
   })
   .eq("id", newDriverId);
+
+if (platformId) {
+  newDriverMutation = newDriverMutation.eq("platform_id", platformId);
+}
+
+const { error: newDriverError } = await newDriverMutation;
 
 if (newDriverError) {
   throw newDriverError;

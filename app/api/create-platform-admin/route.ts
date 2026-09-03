@@ -101,7 +101,7 @@ return NextResponse.json({
   success: true,
   user_id: user.id,
 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }

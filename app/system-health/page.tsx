@@ -2,6 +2,7 @@
 
 import AdminLayout from "../../components/AdminLayout";
 import { useEffect, useState } from "react";
+import { getUserPlatform } from "../../lib/getUserPlatform";
 import { supabase } from "../../lib/supabase";
 
 export default function SystemHealthPage() {
@@ -11,38 +12,35 @@ const [vehicleCount, setVehicleCount] = useState(0);
 const [tripCount, setTripCount] = useState(0);
 const [agentCount, setAgentCount] = useState(0);
 
-const [routeGroupCount, setRouteGroupCount] = useState(0);
-const [notificationCount, setNotificationCount] = useState(0);
-const [emergencyCount, setEmergencyCount] = useState(0);
-const [healthScore, setHealthScore] = useState(100);
+const [healthScore] = useState(100);
 
 async function runDiagnostics() {
   try {
+const userPlatform = await getUserPlatform();
+
+if (!userPlatform) {
+  window.location.replace("/login");
+  return;
+}
+
+const platformId = userPlatform.platformId;
+
 const [
   { count: drivers },
   { count: vehicles },
   { count: trips },
   { count: agents },
-  { count: routeGroups },
-  { count: notifications },
-  { count: emergencies },
 ] = await Promise.all([
-  supabase.from("drivers").select("*", { count: "exact", head: true }),
-  supabase.from("vehicles").select("*", { count: "exact", head: true }),
-  supabase.from("trips").select("*", { count: "exact", head: true }),
-  supabase.from("agents").select("*", { count: "exact", head: true }),
-  supabase.from("route_groups").select("*", { count: "exact", head: true }),
-  supabase.from("notification_logs").select("*", { count: "exact", head: true }),
-  supabase.from("emergency_alerts").select("*", { count: "exact", head: true }),
+  supabase.from("drivers").select("*", { count: "exact", head: true }).eq("platform_id", platformId),
+  supabase.from("vehicles").select("*", { count: "exact", head: true }).eq("platform_id", platformId),
+  supabase.from("trips").select("*", { count: "exact", head: true }).eq("platform_id", platformId),
+  supabase.from("agents").select("*", { count: "exact", head: true }).eq("platform_id", platformId),
 ]);
 
     setDriverCount(drivers ?? 0);
     setVehicleCount(vehicles ?? 0);
     setTripCount(trips ?? 0);
     setAgentCount(agents ?? 0);
-setRouteGroupCount(routeGroups ?? 0);
-setNotificationCount(notifications ?? 0);
-setEmergencyCount(emergencies ?? 0);
     setDatabaseHealthy(true);
   } catch (err) {
     console.error(err);
@@ -51,6 +49,7 @@ setEmergencyCount(emergencies ?? 0);
 }
 
 useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   runDiagnostics();
 }, []);
 

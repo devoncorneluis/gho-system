@@ -84,6 +84,7 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDashboard();
     const timer = setInterval(loadDashboard, 10000);
     return () => clearInterval(timer);
@@ -114,7 +115,7 @@ export default function AdminPage() {
   Platform Admin Portal
 </h1>
 <p className="text-gray-300 mt-3 max-w-2xl">
-  Manage your company's transport operations, daily planning,
+  Manage your company&apos;s transport operations, daily planning,
   driver &amp; vehicle management, passenger movements and
   operational reporting.
 </p>

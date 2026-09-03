@@ -23,10 +23,6 @@ export async function getUserPlatform(): Promise<UserPlatform | null> {
     .eq("id", user.id)
     .single();
 
-  console.log("AUTH USER", user);
-  console.log("PROFILE", profile);
-  console.log("PROFILE ERROR", error);
-
   if (error || !profile?.role) {
     return null;
   }

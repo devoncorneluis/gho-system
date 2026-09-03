@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import { acceptDriverDispatch, rejectDriverDispatch } from "../../lib/dispatchService";
 import { TRIP_STATUS, TRIP_STATUS_COLORS, getStatusLabel } from "../../lib/tripStatus";
+import type { TripStatus } from "../../lib/tripStatus";
 
 type TripRow = {
   id: string;
@@ -17,7 +18,31 @@ type TripRow = {
   status?: string | null;
   driver_response?: string | null;
   passenger_count?: number | null;
+  platform_id?: string | null;
 };
+
+type RealtimePayload = {
+  eventType?: "INSERT" | "UPDATE" | "DELETE";
+  type?: "INSERT" | "UPDATE" | "DELETE";
+  event?: "INSERT" | "UPDATE" | "DELETE";
+  new?: TripRow | null;
+  old?: TripRow | null;
+};
+
+const ACTIVE_STATUSES: string[] = [
+  TRIP_STATUS.PLANNED,
+  TRIP_STATUS.APPROVED,
+  TRIP_STATUS.ASSIGNED,
+  TRIP_STATUS.DISPATCHED,
+  TRIP_STATUS.ACCEPTED,
+  TRIP_STATUS.EN_ROUTE,
+  TRIP_STATUS.PICKING_UP,
+  TRIP_STATUS.IN_TRANSIT,
+];
+
+function isActiveStatus(status?: string | null): boolean {
+  return typeof status === "string" && ACTIVE_STATUSES.includes(status);
+}
 
 export default function DispatchQueuePanel() {
   const [trips, setTrips] = useState<TripRow[]>([]);
@@ -25,22 +50,7 @@ export default function DispatchQueuePanel() {
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string[]>([]);
 
-  const activeStatuses = [
-    TRIP_STATUS.PLANNED,
-    TRIP_STATUS.APPROVED,
-    TRIP_STATUS.ASSIGNED,
-    TRIP_STATUS.DISPATCHED,
-    TRIP_STATUS.ACCEPTED,
-    TRIP_STATUS.EN_ROUTE,
-    TRIP_STATUS.PICKING_UP,
-    TRIP_STATUS.IN_TRANSIT,
-  ];
-
-  function isActiveStatus(status?: string | null) {
-    return !!status && activeStatuses.includes(status as any);
-  }
-
-  function applyInsert(newRec: any, platformId: string) {
+  const applyInsert = useCallback((newRec: TripRow | null, platformId: string) => {
     if (!newRec) return;
     if (newRec.platform_id && newRec.platform_id !== platformId) return;
     if (!isActiveStatus(newRec.status)) return;
@@ -64,12 +74,12 @@ export default function DispatchQueuePanel() {
       next.sort((a, b) => (a.trip_date || "").localeCompare(b.trip_date || ""));
       return next;
     });
-  }
+  }, []);
 
-  function applyDelete(oldRec: any) {
+  const applyDelete = useCallback((oldRec: TripRow | null) => {
     if (!oldRec) return;
     setTrips((prev) => prev.filter((p) => p.id !== oldRec.id));
-  }
+  }, []);
 
   function markProcessing(id: string) {
     setProcessing((s) => (s.includes(id) ? s : [...s, id]));
@@ -97,12 +107,12 @@ export default function DispatchQueuePanel() {
 
     try {
       await acceptDriverDispatch(trip.id, platformId, userId);
-    } catch (e: any) {
+    } catch (e: unknown) {
       // revert
       if (prev) {
         setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? prev : t)));
       }
-      setError(e?.message || String(e));
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       unmarkProcessing(trip.id);
     }
@@ -123,17 +133,17 @@ export default function DispatchQueuePanel() {
 
     try {
       await rejectDriverDispatch(trip.id, platformId, userId);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (prev) {
         setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? prev : t)));
       }
-      setError(e?.message || String(e));
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       unmarkProcessing(trip.id);
     }
   }
 
-  function applyUpdate(oldRec: any, newRec: any, platformId: string) {
+  const applyUpdate = useCallback((oldRec: TripRow | null, newRec: TripRow | null, platformId: string) => {
     if (newRec && newRec.platform_id && newRec.platform_id !== platformId) return;
 
     setTrips((prev) => {
@@ -148,7 +158,7 @@ export default function DispatchQueuePanel() {
       }
 
       // If it was not present but now active, insert
-      if (!wasPresent && nowActive) {
+      if (!wasPresent && nowActive && newRec) {
         const row: TripRow = {
           id: newRec.id,
           trip_code: newRec.trip_code,
@@ -167,7 +177,7 @@ export default function DispatchQueuePanel() {
       }
 
       // Otherwise update in-place
-      if (wasPresent && nowActive) {
+      if (wasPresent && nowActive && newRec) {
         const updated = { ...(prev[idx] as TripRow) };
         if (newRec.trip_code !== undefined) updated.trip_code = newRec.trip_code;
         if (newRec.trip_date !== undefined) updated.trip_date = newRec.trip_date;
@@ -187,13 +197,53 @@ export default function DispatchQueuePanel() {
 
       return prev;
     });
-  }
+  }, []);
+
+  const loadTrips = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    const userPlatform = await getUserPlatform();
+    if (!userPlatform) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const platformId = userPlatform.platformId;
+
+    try {
+      const { data, error } = await supabase
+        .from("trips")
+        .select(
+          "id, trip_code, trip_date, shift, area, driver_name, vehicle_name, status, driver_response, passenger_count"
+        )
+        .in("status", ACTIVE_STATUSES)
+        .eq("platform_id", platformId)
+        .order("trip_date", { ascending: true });
+
+      if (error) {
+        setError(error.message);
+        setTrips([]);
+      } else {
+        setTrips((data as TripRow[]) || []);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+      setTrips([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let channel: any = null;
+    let channel: {
+      subscribe?: () => unknown;
+      unsubscribe?: () => void;
+    } | null = null;
     let isMounted = true;
 
-    loadTrips();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadTrips();
     const timer = setInterval(() => {
       if (isMounted) loadTrips();
     }, 10000);
@@ -211,9 +261,10 @@ export default function DispatchQueuePanel() {
             { event: "*", schema: "public", table: "trips" },
             (payload) => {
               try {
-                const evType = (payload as any).eventType || (payload as any).type || (payload as any).event || null;
-                const newRec = (payload as any).new || null;
-                const oldRec = (payload as any).old || null;
+                const typedPayload = payload as unknown as RealtimePayload;
+                const evType = typedPayload.eventType || typedPayload.type || typedPayload.event || null;
+                const newRec = typedPayload.new || null;
+                const oldRec = typedPayload.old || null;
                 const record = newRec || oldRec;
                 if (!record) return;
                 if (record.platform_id && record.platform_id !== platformId) return;
@@ -233,7 +284,7 @@ export default function DispatchQueuePanel() {
           );
 
         try {
-          await channel.subscribe();
+          channel.subscribe?.();
         } catch (subErr) {
           // subscription may fail in local dev without real-time enabled — fall back to polling
           console.warn("Supabase realtime subscription failed:", subErr);
@@ -248,69 +299,20 @@ export default function DispatchQueuePanel() {
       clearInterval(timer);
       try {
         if (channel) {
-          // unsubscribe the channel if available
-          // @ts-ignore
-          channel.unsubscribe?.();
+          const maybeChannel = channel as { unsubscribe?: () => void };
+          maybeChannel.unsubscribe?.();
           try {
-            // v2 client exposes removeChannel
-            // @ts-ignore
-            supabase.removeChannel?.(channel);
-          } catch (e) {
-            /* ignore */
+            const maybeClient = supabase as { removeChannel?: (value: unknown) => void };
+            maybeClient.removeChannel?.(channel);
+          } catch {
+            // ignore cleanup errors
           }
         }
-      } catch (e) {
-        /* ignore */
+      } catch {
+        // ignore cleanup errors
       }
     };
-  }, []);
-
-  async function loadTrips() {
-    setLoading(true);
-    setError(null);
-
-    const userPlatform = await getUserPlatform();
-    if (!userPlatform) {
-      window.location.href = "/login";
-      return;
-    }
-
-    const platformId = userPlatform.platformId;
-
-    try {
-      const activeStatuses = [
-        TRIP_STATUS.PLANNED,
-        TRIP_STATUS.APPROVED,
-        TRIP_STATUS.ASSIGNED,
-        TRIP_STATUS.DISPATCHED,
-        TRIP_STATUS.ACCEPTED,
-        TRIP_STATUS.EN_ROUTE,
-        TRIP_STATUS.PICKING_UP,
-        TRIP_STATUS.IN_TRANSIT,
-      ];
-
-      const { data, error } = await supabase
-        .from("trips")
-        .select(
-          "id, trip_code, trip_date, shift, area, driver_name, vehicle_name, status, driver_response, passenger_count"
-        )
-        .in("status", activeStatuses)
-        .eq("platform_id", platformId)
-        .order("trip_date", { ascending: true });
-
-      if (error) {
-        setError(error.message);
-        setTrips([]);
-      } else {
-        setTrips((data as TripRow[]) || []);
-      }
-    } catch (err: any) {
-      setError(err?.message || String(err));
-      setTrips([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [applyDelete, applyInsert, applyUpdate, loadTrips]);
 
   if (loading) {
     return (
@@ -370,7 +372,7 @@ export default function DispatchQueuePanel() {
                           : "text-gray-700 bg-gray-100"
                       }`}
                     >
-                      {t.status ? getStatusLabel(t.status as any) : "Unknown"}
+                      {t.status ? getStatusLabel(t.status as TripStatus) : "Unknown"}
                     </span>
                   </td>
                   <td>

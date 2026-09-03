@@ -20,7 +20,7 @@ type Invoice = {
 
 export default function BillingPage() {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [stats, setStats] = useState({
+    const [, setStats] = useState({
   outstanding: 0,
   paid: 0,
   revenue: 0,

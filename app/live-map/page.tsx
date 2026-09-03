@@ -6,7 +6,7 @@ import {
   Map,
   Marker,
 } from "@vis.gl/react-google-maps";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
@@ -58,10 +58,12 @@ export default function LiveMapPage() {
   }, []);
   // const [selectedEmergency, setSelectedEmergency] = useState<EmergencyAlertPin | null>(null);
 
-  async function loadLocations() {
+  const loadLocations = useCallback(async () => {
+    if (!platformId) return;
 const { data, error } = await supabase
   .from("driver_locations")
   .select("*")
+  .eq("platform_id", platformId)
   .order("updated_at", { ascending: false });
 
     if (error) {
@@ -70,9 +72,10 @@ const { data, error } = await supabase
     }
 
     setLocations(data || []);
-  }
+  }, [platformId]);
 
-  async function loadEmergencies() {
+  const loadEmergencies = useCallback(async () => {
+    if (!platformId) return;
     const { data, error } = await supabase
       .from("emergency_alerts")
       .select("*")
@@ -86,11 +89,12 @@ const { data, error } = await supabase
     }
 
     setEmergencies(data || []);
-  }
+  }, [platformId]);
 
 useEffect(() => {
   if (!platformId) return;
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   loadLocations();
   loadEmergencies();
 
@@ -100,7 +104,7 @@ useEffect(() => {
   }, 10000);
 
   return () => clearInterval(timer);
-}, [platformId]);
+}, [platformId, loadEmergencies, loadLocations]);
   const firstLocation = locations.find(
     (location) => location.latitude && location.longitude
   );

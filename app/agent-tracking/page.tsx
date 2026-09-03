@@ -1,7 +1,7 @@
 "use client";
 
 import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 
@@ -28,22 +28,15 @@ type Trip = {
   area: string | null;
 };
 
-type Agent = {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-};
-
 export default function AgentTrackingPage() {
   const [platformId, setPlatformId] = useState("");
   const [agentName, setAgentName] = useState("Agent");
   const [agentEmail, setAgentEmail] = useState("");
-  const [agent, setAgent] = useState<Agent | null>(null);
   const [locations, setLocations] = useState<DriverLocation[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  async function loadData(activePlatformId?: string, activeAgentEmail?: string) {
+  const loadData = useCallback(async (activePlatformId?: string, activeAgentEmail?: string) => {
     const finalPlatformId = activePlatformId || platformId;
     const finalAgentEmail = activeAgentEmail || agentEmail;
 
@@ -102,9 +95,9 @@ const { data: locationData } = await supabase
 
     setLocations(locationData || []);
     setTrips(tripData || []);
-  }
+  }, [agentEmail, platformId]);
 
-  async function setupPage() {
+  const setupPage = useCallback(async () => {
     const userPlatform = await getUserPlatform();
 
     if (!userPlatform) {
@@ -123,7 +116,6 @@ const { data: locationData } = await supabase
         .maybeSingle();
 
       if (agent?.full_name) {
-        setAgent(agent);
         setAgentName(agent.full_name);
         setAgentEmail(agent.email || "");
 
@@ -132,19 +124,20 @@ const { data: locationData } = await supabase
     }
 
     if (!userPlatform.email) {
-      loadData(userPlatform.platformId);
+      await loadData(userPlatform.platformId);
     }
-  }
+  }, [loadData]);
 
   useEffect(() => {
-    setupPage();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void setupPage();
 
     const timer = setInterval(() => {
-      loadData(platformId, agentEmail);
+      void loadData(platformId, agentEmail);
     }, 10000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [agentEmail, loadData, platformId, setupPage]);
 
   const firstLocation = locations.find(
     (location) => location.latitude && location.longitude

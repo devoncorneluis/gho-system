@@ -1,6 +1,7 @@
 import type { ExecutiveMetrics } from "../../types/analytics";
 
 export interface ExecutiveAnalyticsInput {
+  revenue?: number;
   totalTrips?: number;
   activeTrips?: number;
   completedTrips?: number;
@@ -12,6 +13,7 @@ export interface ExecutiveAnalyticsInput {
 
 export function buildExecutiveMetrics(input: ExecutiveAnalyticsInput): ExecutiveMetrics {
   return {
+    revenue: input.revenue ?? 0,
     totalTrips: input.totalTrips ?? 0,
     activeTrips: input.activeTrips ?? 0,
     completedTrips: input.completedTrips ?? 0,

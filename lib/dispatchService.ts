@@ -3,7 +3,7 @@ import { canTransitionTripStatus } from "./tripStatus";
 import { recordTripEvent } from "./tripEventService";
 import { logAuditEvent } from "./auditService";
 import { applyTripMutationScope, assertPlatformScope } from "./security/tenantScope";
-
+import { recordOperationHistory } from "./operationsHistory";
 type UpdateTripStatusOptions = {
   dispatchedBy?: string;
   platformId?: string;
@@ -20,7 +20,15 @@ export async function updateTripStatus(
       `Invalid status transition: ${currentStatus} → ${nextStatus}`
     );
   }
-
+const { data: trip } = await supabase
+  .from("trips")
+  .select(`
+    trip_code,
+    driver_name,
+    vehicle_name
+  `)
+  .eq("id", tripId)
+  .maybeSingle();
   const updateData: Record<string, unknown> = {
     status: nextStatus,
   };
@@ -64,10 +72,32 @@ export async function updateTripStatus(
       to: nextStatus,
     },
   });
+await recordOperationHistory({
+  tripId,
+  tripCode: trip?.trip_code ?? null,
 
-  return true;
+  platformId: scopedPlatformId,
+
+  eventType: nextStatus.toLowerCase(),
+
+  eventTitle: `Trip ${nextStatus}`,
+
+  eventDescription: `Trip status changed from ${currentStatus} to ${nextStatus}.`,
+
+  driverName: trip?.driver_name ?? null,
+  vehicleName: trip?.vehicle_name ?? null,
+
+  severity:
+    nextStatus === "completed"
+      ? "success"
+      : nextStatus === "cancelled"
+      ? "warning"
+      : nextStatus === "dispatched"
+      ? "info"
+      : "info",
+});
+return true;
 }
-
 export async function acceptDriverDispatch(
   tripId: string,
   platformId?: string,
@@ -170,19 +200,21 @@ return updateTripStatus(
   );
 }
 export async function startTrip(
-  supabase: any,
+  supabase: unknown,
   tripId: string,
   platformId: string,
   driverId: string,
   vehicleId: string
 ) {
+  const client = supabase as typeof import("./supabase").supabase;
   const startedAt = new Date().toISOString();
 
-  const { error: tripError } = await supabase
+  const { error: tripError } = await client
     .from("trips")
     .update({
       started_at: startedAt,
     })
+    .eq("platform_id", platformId)
     .eq("id", tripId);
 
   if (tripError) throw tripError;
@@ -197,39 +229,43 @@ await updateTripStatus(
   }
 );
 
-  const { error: driverError } = await supabase
+  const { error: driverError } = await client
     .from("drivers")
     .update({
       status: "On Trip",
       availability_status: "On Trip",
     })
+    .eq("platform_id", platformId)
     .eq("id", driverId);
 
   if (driverError) throw driverError;
-const { error: vehicleError } = await supabase
+const { error: vehicleError } = await client
   .from("vehicles")
   .update({
     status: "On Trip",
     availability_status: "On Trip",
   })
+  .eq("platform_id", platformId)
   .eq("id", vehicleId);
 
 if (vehicleError) throw vehicleError;
   return true;
 }
 export async function arriveAtPickup(
-  supabase: any,
+  supabase: unknown,
   tripId: string,
   platformId: string,
   driverId: string
 ) {
+  const client = supabase as typeof import("./supabase").supabase;
   const arrivedAt = new Date().toISOString();
 
-  const { error: tripError } = await supabase
+  const { error: tripError } = await client
     .from("trips")
     .update({
       pickup_arrived_at: arrivedAt,
     })
+    .eq("platform_id", platformId)
     .eq("id", tripId);
 
   if (tripError) throw tripError;
@@ -267,19 +303,21 @@ export async function arriveAtPickup(
   return true;
 }
 export async function completeTrip(
-  supabase: any,
+  supabase: unknown,
   tripId: string,
   platformId: string,
   driverId: string,
   vehicleId: string
 ) {
+  const client = supabase as typeof import("./supabase").supabase;
   const completedAt = new Date().toISOString();
 
-  const { error: tripError } = await supabase
+  const { error: tripError } = await client
     .from("trips")
     .update({
       completed_at: completedAt,
     })
+    .eq("platform_id", platformId)
     .eq("id", tripId);
 
   if (tripError) throw tripError;
@@ -314,12 +352,13 @@ platform_id: platformId,
 
 
 
-const { error: vehicleError } = await supabase
+const { error: vehicleError } = await client
   .from("vehicles")
   .update({
     status: "Available",
     availability_status: "Available",
   })
+  .eq("platform_id", platformId)
   .eq("id", vehicleId);
 
 if (vehicleError) throw vehicleError;
@@ -328,7 +367,7 @@ if (vehicleError) throw vehicleError;
 }
 
 export async function cancelTrip(
-  supabase: any,
+  supabase: unknown,
   tripId: string,
   platformId: string,
   currentStatus: string,
@@ -336,13 +375,15 @@ export async function cancelTrip(
   vehicleId: string,
   reason = "Cancelled by dispatcher"
 ){
+  const client = supabase as typeof import("./supabase").supabase;
   const cancelledAt = new Date().toISOString();
 
-  const { error: tripError } = await supabase
+  const { error: tripError } = await client
     .from("trips")
     .update({
       cancelled_at: cancelledAt,
     })
+    .eq("platform_id", platformId)
     .eq("id", tripId);
 
   if (tripError) throw tripError;
@@ -377,22 +418,24 @@ platform_id: platformId,
     },
   });
 
-const { error: driverError } = await supabase
+const { error: driverError } = await client
   .from("drivers")
   .update({
     status: "Available",
     availability_status: "Available",
   })
+  .eq("platform_id", platformId)
   .eq("id", driverId);
 
 if (driverError) throw driverError;
 
-const { error: vehicleError } = await supabase
+const { error: vehicleError } = await client
   .from("vehicles")
   .update({
     status: "Available",
     availability_status: "Available",
   })
+  .eq("platform_id", platformId)
   .eq("id", vehicleId);
 
 if (vehicleError) throw vehicleError;
@@ -400,10 +443,11 @@ if (vehicleError) throw vehicleError;
 return true;
 }
 export async function getCurrentTripForDriver(
-  supabase: any,
+  supabase: unknown,
   driverId: string
 ) {
-  const { data, error } = await supabase
+  const client = supabase as typeof import("./supabase").supabase;
+  const { data, error } = await client
     .from("trips")
     .select(`
       id,
@@ -415,7 +459,9 @@ export async function getCurrentTripForDriver(
       vehicle_name,
       trip_date,
       shift,
-      passenger_count
+      passenger_count,
+      destination_latitude,
+      destination_longitude
     `)
     .eq("driver_id", driverId)
     .in("status", [
@@ -437,10 +483,11 @@ export async function getCurrentTripForDriver(
   return data;
 }
 export async function getTripPassengers(
-  supabase: any,
+  supabase: unknown,
   tripId: string
 ) {
-  const { data, error } = await supabase
+  const client = supabase as typeof import("./supabase").supabase;
+  const { data, error } = await client
     .from("trip_passengers")
     .select(`
       id,

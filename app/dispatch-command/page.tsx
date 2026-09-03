@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
 
@@ -18,7 +18,6 @@ export default function DispatchCommandPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [search, setSearch] = useState("");
 const [statusFilter, setStatusFilter] = useState("all");
-const [alerts, setAlerts] = useState<string[]>([]);
 
 async function dispatchTrip(tripId: string) {
   const { error } = await supabase
@@ -83,35 +82,34 @@ useEffect(() => {
   loadTrips();
 }, []);
 
-function buildAlerts() {
+const alerts = useMemo(() => {
   const list: string[] = [];
 
   trips.forEach((trip) => {
+    const tripLabel = trip.trip_code ?? "Uncoded Trip";
+
     if (trip.driver_response === "rejected") {
-      list.push(`${trip.trip_code}: Driver rejected dispatch`);
+      list.push(`${tripLabel}: Driver rejected dispatch`);
     }
 
     if (!trip.driver_response) {
-      list.push(`${trip.trip_code}: Awaiting driver response`);
+      list.push(`${tripLabel}: Awaiting driver response`);
     }
 
     if (!trip.driver_name) {
-      list.push(`${trip.trip_code}: No driver assigned`);
+      list.push(`${tripLabel}: No driver assigned`);
     }
 
     if (!trip.vehicle_name) {
-      list.push(`${trip.trip_code}: No vehicle assigned`);
+      list.push(`${tripLabel}: No vehicle assigned`);
     }
 
     if ((trip.passenger_count ?? 0) === 0) {
-      list.push(`${trip.trip_code}: No passengers assigned`);
+      list.push(`${tripLabel}: No passengers assigned`);
     }
   });
-  setAlerts(list);
-}
 
-useEffect(() => {
-  buildAlerts();
+  return list;
 }, [trips]);
 // Auto refresh every 10 seconds
 useEffect(() => {
@@ -164,6 +162,19 @@ const filteredTrips = trips.filter((trip) => {
         <p className="mt-2 text-gray-600">
           Monitor and control all live transport operations.
         </p>
+
+        {alerts.length > 0 && (
+          <div className="mt-5 rounded-xl border border-orange-200 bg-orange-50 p-4">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-orange-700">
+              Dispatch Alerts
+            </h2>
+            <div className="mt-2 space-y-1 text-sm text-orange-900">
+              {alerts.slice(0, 8).map((alertText, index) => (
+                <p key={`${alertText}-${index}`}>• {alertText}</p>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 grid gap-4 md:grid-cols-4">
           <div className="rounded-xl bg-white p-5 shadow">

@@ -30,6 +30,12 @@ function statusTone(status: string) {
   }
 }
 
+type FleetVehicleRow = {
+  id: string;
+  vehicle_name: string | null;
+  status: string | null;
+};
+
 export default function FleetStatusPanel() {
   const [units, setUnits] = useState<FleetUnit[]>(fallbackFleet);
 
@@ -54,7 +60,7 @@ export default function FleetStatusPanel() {
           return;
         }
 
-        const mapped = data.map((vehicle: any) => ({
+        const mapped = ((data as FleetVehicleRow[] | null) ?? []).map((vehicle) => ({
           id: vehicle.id,
           name: vehicle.vehicle_name || "Unnamed vehicle",
           status: vehicle.status || "Unknown",

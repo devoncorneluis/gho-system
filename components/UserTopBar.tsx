@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 
@@ -20,9 +21,9 @@ export default function UserTopBar() {
         ← Back
       </button>
 
-      <a href="/" className="font-bold text-xl">
+      <Link href="/" className="font-bold text-xl">
         GHO
-      </a>
+      </Link>
 
       <button
         onClick={logout}

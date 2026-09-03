@@ -1,8 +1,9 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-
-
+import { use, useCallback, useEffect, useRef, useState } from "react";
+import { publishFleetEvent } from "../../../lib/fleet/fleetEventBus";
+import { getFleetEvent } from "../../../lib/fleet/fleetEventEngine";
+import { logActivity } from "../../../lib/activity/activityLogger";
 import { supabase } from "../../../lib/supabase";
 import TripTimeline, {
   TimelineEvent,
@@ -37,40 +38,30 @@ type Trip = {
 
   started_at: string | null;
   completed_at: string | null;
+  last_gps_update: string | null;
+driver_latitude: number | null;
+driver_longitude: number | null;
+driver_speed: number | null;
+driver_heading: number | null;
 };
-
-type Passenger = {
-  id: string;
-
-  full_name: string | null;
-
-  phone: string | null;
-
-  pickup_address: string | null;
-  pickup_area: string | null;
-
-  pickup_time: string | null;
-
-  pickup_status: string | null;
-};
-
 export default function TripDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-
+const watchIdRef = useRef<number | null>(null);
   const [trip, setTrip] = useState<Trip | null>(null);
-  const [passengers, setPassengers] = useState<Passenger[]>([]);
 const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
-  const [showTicketModal, setShowTicketModal] = useState(false);
+const [liveLocation, setLiveLocation] = useState<{
+  latitude: number;
+  longitude: number;
+  speed: number;
+  heading: number;
+  updated_at: string;
+} | null>(null);
 
-  const [ticketSubject, setTicketSubject] = useState("");
-  const [ticketDescription, setTicketDescription] = useState("");
-  const [ticketPriority, setTicketPriority] = useState("Medium");
-
-  async function loadTrip() {
+  const loadTrip = useCallback(async () => {
     const { data } = await supabase
       .from("trips")
       .select("*")
@@ -87,178 +78,215 @@ if (data) {
 
   setTimeline(timelineData);
 }
+if (data?.driver_id) {
+  const { data: location } = await supabase
+    .from("driver_locations")
+    .select("latitude, longitude, speed, heading, updated_at")
+    .eq("driver_id", data.driver_id)
+    .eq("trip_id", data.id)
+    .single();
 
-    const { data: passengerData } = await supabase
-      .from("trip_passengers")
-      .select("*")
-      .eq("trip_id", id)
-      .order("pickup_time");
+  setLiveLocation(location ?? null);
+}
+}, [id]);
 
-    setPassengers(passengerData || []);
-  }
+async function startTrip() {
+  function startLocationTracking(driverId: string, tripId: string) {
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      async (position) => {
+        await supabase
+          .from("driver_locations")
+          .upsert({
+            driver_id: driverId,
+            trip_id: tripId,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            speed: position.coords.speed ?? 0,
+            heading: position.coords.heading ?? 0,
+            updated_at: new Date().toISOString(),
+          });
 
-  async function startTrip() {
-    function startLocationTracking(driverId: string, tripId: string) {
-  navigator.geolocation.watchPosition(
-    async (position) => {
-      await supabase
-        .from("driver_locations")
-        .upsert({
+        await supabase.from("driver_location_history").insert({
+          platform_id: trip?.platform_id,
           driver_id: driverId,
           trip_id: tripId,
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           speed: position.coords.speed ?? 0,
           heading: position.coords.heading ?? 0,
-          updated_at: new Date().toISOString(),
+          recorded_at: new Date().toISOString(),
         });
-    },
-    (error) => {
-      console.error(error);
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 5000,
-      timeout: 10000,
-    }
+      },
+      (error) => {
+        console.error(error);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 5000,
+        timeout: 10000,
+      }
+    );
+  }
+
+  if (!trip) return;
+
+  if (!trip.platform_id) {
+    alert("Trip platform context is missing.");
+    return;
+  }
+
+  const { error } = await supabase
+    .from("trips")
+    .update({
+      status: "In Progress",
+      started_at: new Date().toISOString(),
+    })
+    .eq("id", trip.id)
+    .eq("platform_id", trip.platform_id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  publishFleetEvent(
+    getFleetEvent("trip_started", {
+      driverName: trip.driver_name ?? "Driver",
+      tripCode: trip.trip_code ?? "Unknown",
+    })
   );
+
+  await recordTripEvent({
+    tripId: trip.id,
+    platformId: trip.platform_id,
+    createdBy: trip.driver_id,
+    eventType: "trip_started",
+    eventData: {
+      description: `${trip.trip_code} was started.`,
+      tripCode: trip.trip_code,
+      driverName: trip.driver_name,
+      vehicleName: trip.vehicle_name,
+    },
+  });
+await logActivity({
+  platformId: trip.platform_id,
+  activityType: "trip_started",
+  entityType: "trip",
+  entityId: trip.id,
+  entityName: trip.trip_code ?? "",
+  description: `${trip.driver_name} started trip ${trip.trip_code}`,
+  createdBy: trip.driver_id ?? undefined,
+  createdByName: trip.driver_name ?? undefined,
+  metadata: {
+    vehicle: trip.vehicle_name,
+  },
+});
+  if (trip.driver_id) {
+    startLocationTracking(trip.driver_id, trip.id);
+  }
+
+  await loadTrip();
+
+  alert("Trip started.");
 }
-    if (!trip) return;
 
-    if (!trip.platform_id) {
-      alert("Trip platform context is missing.");
-      return;
-    }
+async function completeTrip() {
+  if (!trip) return;
 
-    const { error } = await supabase
-      .from("trips")
-      .update({
-        status: "In Progress",
-        started_at: new Date().toISOString(),
-      })
-      .eq("id", trip.id)
-      .eq("platform_id", trip.platform_id);
+  if (!confirm("Complete this trip?")) return;
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-await recordTripEvent({
-  tripId: trip.id,
-  platformId: trip.platform_id,
-  createdBy: trip.driver_id,
-  eventType: "trip_started",
-  eventData: {
-    description: `${trip.trip_code} was started.`,
-    tripCode: trip.trip_code,
-    driverName: trip.driver_name,
-    vehicleName: trip.vehicle_name,
-  },
-});
-    if (trip.driver_id) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          await supabase
-            .from("driver_locations")
-            .upsert({
-              driver_id: trip.driver_id,
-              trip_id: trip.id,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              speed: position.coords.speed ?? 0,
-              heading: position.coords.heading ?? 0,
-              updated_at: new Date().toISOString(),
-            });
-
-          await supabase
-            .from("drivers")
-            .update({
-              last_location_update: new Date().toISOString(),
-            })
-            .eq("id", trip.driver_id)
-            .eq("platform_id", trip.platform_id);
-        },
-        (error) => {
-          console.error(error);
-        }
-      );
-    }
-
-    await loadTrip();
-
-    alert("Trip started.");
+  if (!trip.platform_id) {
+    alert("Trip platform context is missing.");
+    return;
   }
 
-  async function completeTrip() {
-    if (!trip) return;
+  const { error } = await supabase
+    .from("trips")
+    .update({
+      status: "Completed",
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", trip.id)
+    .eq("platform_id", trip.platform_id);
 
-    if (!confirm("Complete this trip?")) return;
+  if (error) {
+    alert(error.message);
+    return;
+  }
 
-    if (!trip.platform_id) {
-      alert("Trip platform context is missing.");
-      return;
-    }
+  publishFleetEvent(
+    getFleetEvent("trip_completed", {
+      driverName: trip.driver_name ?? "Driver",
+      tripCode: trip.trip_code ?? "Unknown",
+    })
+  );
 
-    const { error } = await supabase
-      .from("trips")
-      .update({
-        status: "Completed",
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", trip.id)
-      .eq("platform_id", trip.platform_id);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-await recordTripEvent({
-  tripId: trip.id,
+  await recordTripEvent({
+    tripId: trip.id,
+    platformId: trip.platform_id,
+    createdBy: trip.driver_id,
+    eventType: "trip_completed",
+    eventData: {
+      description: `${trip.trip_code} was completed.`,
+      tripCode: trip.trip_code,
+      driverName: trip.driver_name,
+      vehicleName: trip.vehicle_name,
+    },
+  });
+await logActivity({
   platformId: trip.platform_id,
-  createdBy: trip.driver_id,
-  eventType: "trip_completed",
-  eventData: {
-    description: `${trip.trip_code} was completed.`,
-    tripCode: trip.trip_code,
-    driverName: trip.driver_name,
-    vehicleName: trip.vehicle_name,
+  activityType: "trip_completed",
+  entityType: "trip",
+  entityId: trip.id,
+  entityName: trip.trip_code ?? "",
+  description: `${trip.driver_name} completed trip ${trip.trip_code}`,
+  createdBy: trip.driver_id ?? undefined,
+  createdByName: trip.driver_name ?? undefined,
+  metadata: {
+    vehicle: trip.vehicle_name,
   },
 });
+  await supabase
+    .from("trip_passengers")
+    .update({
+      pickup_status: "Completed",
+    })
+    .eq("trip_id", trip.id)
+    .eq("platform_id", trip.platform_id);
+
+  if (trip.driver_id) {
     await supabase
-      .from("trip_passengers")
+      .from("drivers")
       .update({
-        pickup_status: "Completed",
+        status: "Available",
+        availability_status: "Available",
       })
-      .eq("trip_id", trip.id)
+      .eq("id", trip.driver_id)
       .eq("platform_id", trip.platform_id);
-
-    if (trip.driver_id) {
-      await supabase
-        .from("drivers")
-        .update({
-          status: "Available",
-          availability_status: "Available",
-        })
-        .eq("id", trip.driver_id)
-        .eq("platform_id", trip.platform_id);
-    }
-
-    if (trip.vehicle_id) {
-      await supabase
-        .from("vehicles")
-        .update({
-          status: "Available",
-          availability_status: "Available",
-          assigned_driver: null,
-        })
-        .eq("id", trip.vehicle_id)
-        .eq("platform_id", trip.platform_id);
-    }
-
-    await loadTrip();
-
-    alert("Trip completed successfully.");
   }
+
+  if (trip.vehicle_id) {
+    await supabase
+      .from("vehicles")
+      .update({
+        status: "Available",
+        availability_status: "Available",
+        assigned_driver: null,
+      })
+      .eq("id", trip.vehicle_id)
+      .eq("platform_id", trip.platform_id);
+  }
+
+  if (watchIdRef.current !== null) {
+    navigator.geolocation.clearWatch(watchIdRef.current);
+    watchIdRef.current = null;
+  }
+
+  await loadTrip();
+
+  alert("Trip completed successfully.");
+}
+
 async function cancelTrip() {
   if (!trip) return;
 
@@ -276,6 +304,12 @@ async function cancelTrip() {
     alert(error.message);
     return;
   }
+publishFleetEvent(
+  getFleetEvent("trip_cancelled", {
+    driverName: trip.driver_name ?? "Driver",
+    tripCode: trip.trip_code ?? "Unknown",
+  })
+);
 
   await recordTripEvent({
     tripId: trip.id,
@@ -289,82 +323,96 @@ async function cancelTrip() {
       vehicleName: trip.vehicle_name,
     },
   });
+await logActivity({
+platformId: trip.platform_id!,
+  activityType: "trip_cancelled",
+  entityType: "trip",
+  entityId: trip.id,
+  entityName: trip.trip_code ?? "",
+  description: `${trip.driver_name} cancelled trip ${trip.trip_code}`,
+  createdBy: trip.driver_id ?? undefined,
+  createdByName: trip.driver_name ?? undefined,
+  metadata: {
+    vehicle: trip.vehicle_name,
+  },
+});
+  if (watchIdRef.current !== null) {
+    navigator.geolocation.clearWatch(watchIdRef.current);
+    watchIdRef.current = null;
+  }
 
   await loadTrip();
 
   alert("Trip cancelled.");
 }
-  async function createSupportTicket() {
-    if (!trip) return;
 
-    if (!ticketSubject.trim()) {
-      alert("Enter a subject.");
-      return;
-    }
+async function createEmergencyAlert() {
+  if (!trip) return;
 
-    const { error } = await supabase
-      .from("support_tickets")
-      .insert({
-        platform_id: trip.platform_id,
-        trip_id: trip.id,
-        created_by: null,
-        subject: ticketSubject,
-        description: ticketDescription,
-        status: "Open",
-      });
+  if (!confirm("Send an emergency alert?")) return;
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
+  const { error } = await supabase
+    .from("emergency_alerts")
+    .insert({
+      platform_id: trip.platform_id,
+      trip_id: trip.id,
+      driver_id: trip.driver_id,
+      alert_type: "Emergency",
+      notes: `Emergency raised from ${trip.trip_code}`,
+      status: "Open",
+    });
 
-    alert("Support ticket created.");
-
-    setTicketSubject("");
-    setTicketDescription("");
-    setTicketPriority("Medium");
-    setShowTicketModal(false);
+  if (error) {
+    alert(error.message);
+    return;
   }
 
-  async function createEmergencyAlert() {
-    if (!trip) return;
+  publishFleetEvent(
+    getFleetEvent("emergency", {
+      driverName: trip.driver_name ?? "Driver",
+      tripCode: trip.trip_code ?? "Unknown",
+    })
+  );
 
-    if (!confirm("Send an emergency alert?")) return;
+  await recordTripEvent({
+    tripId: trip.id,
+platformId: trip.platform_id!,
+    createdBy: trip.driver_id,
+    eventType: "emergency_raised",
+    eventData: {
+      description: `Emergency raised for ${trip.trip_code}.`,
+      tripCode: trip.trip_code,
+      driverName: trip.driver_name,
+      vehicleName: trip.vehicle_name,
+      alertType: "Emergency",
+    },
+  });
 
-    const { error } = await supabase
-      .from("emergency_alerts")
-      .insert({
-        platform_id: trip.platform_id,
-        trip_id: trip.id,
-        driver_id: trip.driver_id,
-        alert_type: "Emergency",
-        notes: `Emergency raised from ${trip.trip_code}`,
-        status: "Open",
-      });
+  alert("Emergency alert sent successfully.");
+}
+useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  loadTrip();
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-await recordTripEvent({
-  tripId: trip.id,
-  platformId: trip.platform_id,
-  createdBy: trip.driver_id,
-  eventType: "emergency_raised",
-  eventData: {
-    description: `Emergency raised for ${trip.trip_code}.`,
-    tripCode: trip.trip_code,
-    driverName: trip.driver_name,
-    vehicleName: trip.vehicle_name,
-    alertType: "Emergency",
-  },
-});
-    alert("Emergency alert sent successfully.");
-  }
+  const channel = supabase
+    .channel(`trip-location-${id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "driver_locations",
+      },
+      () => {
+        loadTrip();
+      }
+    )
+    .subscribe();
 
-  useEffect(() => {
-    loadTrip();
-  }, []);
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [id, loadTrip]);
 
   if (!trip) {
     return (
@@ -373,7 +421,19 @@ await recordTripEvent({
       </main>
     );
   }
+function gpsStatus() {
+  if (trip?.status === "In Progress") {
+    return {
+      label: "Active",
+      colour: "text-green-600",
+    };
+  }
 
+  return {
+    label: "Inactive",
+    colour: "text-gray-500",
+  };
+}
   return (
     <main className="min-h-screen bg-gray-100 p-6">
       <button
@@ -403,14 +463,54 @@ await recordTripEvent({
               : "Not set"}
           </p>
         </div>
-        <div className="mt-6">
+<div className="mt-6">
   <TripTimeline events={timeline} />
 </div>
-      </div>
+</div>
 
-      <div className="bg-white rounded-xl shadow p-6 mt-6">
-        <h2 className="text-2xl font-bold mb-4">
-          Operations Centre
+<div className="bg-white rounded-xl shadow p-6 mt-6">
+  <h2 className="text-2xl font-bold text-[#061B33] mb-4">
+    Live Tracking
+  </h2>
+
+  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+    <div>
+      <p className="text-sm text-gray-500">GPS Status</p>
+      <p className={`font-bold ${gpsStatus().colour}`}>
+        {gpsStatus().label}
+      </p>
+    </div>
+
+    <div>
+      <p className="text-sm text-gray-500">Trip Status</p>
+      <p className="font-bold">
+        {trip.status}
+      </p>
+    </div>
+
+<div>
+  <p className="text-sm text-gray-500">Current Speed</p>
+  <p className="font-bold">
+    {liveLocation ? `${Math.round(liveLocation.speed)} km/h` : "-"}
+  </p>
+</div>
+
+<div>
+  <p className="text-sm text-gray-500">Last GPS Update</p>
+  <p className="font-bold">
+    {liveLocation
+      ? new Date(liveLocation.updated_at).toLocaleTimeString()
+      : "-"}
+  </p>
+</div>
+
+  </div>
+</div>
+
+<div className="bg-white rounded-xl shadow p-6 mt-6">
+  <h2 className="text-2xl font-bold mb-4">
+    Operations Centre
         </h2>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -454,7 +554,7 @@ await recordTripEvent({
           </button>
 
           <button
-            onClick={() => setShowTicketModal(true)}
+            onClick={() => alert("Support ticket modal coming soon.")}
             className="bg-yellow-500 text-white rounded-xl p-3 font-bold"
           >
             Support Ticket

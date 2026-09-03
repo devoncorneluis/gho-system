@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import TripCard from "../../components/trips/TripCard";
-import TripActions from "../../components/trips/TripActions";
-import PassengerManifest from "../../components/trips/PassengerManifest";
 import StatusBadge from "../../components/trips/StatusBadge";
 import { dispatchTrip } from "../../lib/dispatchService";
+import Pagination from "../../components/common/Pagination";
 
 
 type TripPassenger = {
@@ -25,13 +24,6 @@ type TripPassenger = {
 type Driver = {
   id: string;
   full_name: string | null;
-};
-
-type Vehicle = {
-  id: string;
-  vehicle_name: string | null;
-  registration_number: string | null;
-  assigned_driver?: string | null;
 };
 
 type Trip = {
@@ -53,25 +45,86 @@ type Trip = {
   estimated_km: number | null;
 };
 
+const PAGE_SIZE = 25;
+
 export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [totalTripsCount, setTotalTripsCount] = useState(0);
+  const [confirmedTripsCount, setConfirmedTripsCount] = useState(0);
+  const [inProgressTripsCount, setInProgressTripsCount] = useState(0);
+  const [completedTripsCount, setCompletedTripsCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [passengers, setPassengers] = useState<TripPassenger[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [search, setSearch] = useState("");
   const [platformId, setPlatformId] = useState<string | null>(null);
 
-  type LiveDriver = {  driver_id: string;  driver_name?: string;  trip_id: string | null;  latitude: number;  longitude: number;  speed: number | null;  heading: number | null;  accuracy: number | null;  is_tracking: boolean;  updated_at: string;};
+  type LiveDriver = {
+    driver_id: string;
+    driver_name?: string;
+    trip_id: string | null;
+    latitude: number;
+    longitude: number;
+    speed: number | null;
+    heading: number | null;
+    accuracy: number | null;
+    is_tracking: boolean;
+    updated_at: string;
+  };
+  type DriverLocationRow = LiveDriver & {
+    drivers?: {
+      full_name?: string | null;
+    } | null;
+  };
   const [liveDrivers, setLiveDrivers] = useState<LiveDriver[]>([]);
 
-  async function loadTrips() {
+  const loadTrips = useCallback(async () => {
     if (!platformId) return;
 
-    const { data, error } = await supabase
-      .from("trips")
-      .select("*")
-      .eq("platform_id", platformId)
-      .order("trip_date", { ascending: false });
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const [
+      tripsResult,
+      passengerResult,
+      driverResult,
+      confirmedCountResult,
+      inProgressCountResult,
+      completedCountResult,
+    ] = await Promise.all([
+      supabase
+        .from("trips")
+        .select("*", { count: "exact" })
+        .eq("platform_id", platformId)
+        .order("trip_date", { ascending: false })
+        .range(from, to),
+      supabase
+        .from("trip_passengers")
+        .select("id, trip_id, full_name, phone, pickup_area, pickup_address, pickup_time, pickup_status")
+        .eq("platform_id", platformId),
+      supabase
+        .from("drivers")
+        .select("id, full_name")
+        .eq("platform_id", platformId)
+        .order("full_name", { ascending: true }),
+      supabase
+        .from("trips")
+        .select("id", { count: "exact", head: true })
+        .eq("platform_id", platformId)
+        .eq("status", "Confirmed"),
+      supabase
+        .from("trips")
+        .select("id", { count: "exact", head: true })
+        .eq("platform_id", platformId)
+        .eq("status", "In Progress"),
+      supabase
+        .from("trips")
+        .select("id", { count: "exact", head: true })
+        .eq("platform_id", platformId)
+        .eq("status", "Completed"),
+    ]);
+
+    const { data, error, count } = tripsResult;
 
     if (error) {
       alert(error.message);
@@ -79,11 +132,9 @@ export default function TripsPage() {
     }
 
     setTrips(data || []);
+    setTotalTripsCount(count ?? 0);
 
-    const { data: passengerData, error: passengerError } = await supabase
-      .from("trip_passengers")
-      .select("id, trip_id, full_name, phone, pickup_area, pickup_address, pickup_time, pickup_status")
-      .eq("platform_id", platformId);
+    const { data: passengerData, error: passengerError } = passengerResult;
 
     if (passengerError) {
       alert(passengerError.message);
@@ -92,11 +143,7 @@ export default function TripsPage() {
 
     setPassengers(passengerData || []);
 
-    const { data: driverData, error: driverError } = await supabase
-      .from("drivers")
-      .select("id, full_name")
-      .eq("platform_id", platformId)
-      .order("full_name", { ascending: true });
+    const { data: driverData, error: driverError } = driverResult;
 
     if (driverError) {
       alert(driverError.message);
@@ -105,21 +152,43 @@ export default function TripsPage() {
 
     setDrivers(driverData || []);
 
-    const { data: vehicleData, error: vehicleError } = await supabase
-      .from("vehicles")
-      .select("id, vehicle_name, registration_number, assigned_driver")
-      .eq("platform_id", platformId)
-      .order("vehicle_name", { ascending: true });
+    setConfirmedTripsCount(confirmedCountResult.count ?? 0);
+    setInProgressTripsCount(inProgressCountResult.count ?? 0);
+    setCompletedTripsCount(completedCountResult.count ?? 0);
+  }, [page, platformId]);
 
-    if (vehicleError) {
-      alert(vehicleError.message);
+  const loadLiveDrivers = useCallback(async () => {
+    if (!platformId) return;
+
+    const { data, error } = await supabase
+      .from("driver_locations")
+      .select(`
+        driver_id,
+        trip_id,
+        latitude,
+        longitude,
+        speed,
+        heading,
+        accuracy,
+        is_tracking,
+        updated_at,
+        drivers(full_name)
+      `)
+      .eq("platform_id", platformId)
+      .eq("is_tracking", true);
+
+    if (error) {
+      console.error(error.message);
       return;
     }
 
-    setVehicles(vehicleData || []);
-  }
-
-  async function loadLiveDrivers() {  const { data, error } = await supabase    .from("driver_locations")    .select(`      driver_id,      trip_id,      latitude,      longitude,      speed,      heading,      accuracy,      is_tracking,      updated_at,      drivers(full_name)`    )    .eq("is_tracking", true);  if (error) {    console.error(error.message);    return;  }  setLiveDrivers(    (data || []).map((item: any) => ({      ...item,      driver_name: item.drivers?.full_name ?? "Unknown Driver",    }))  );}
+    setLiveDrivers(
+      (data as DriverLocationRow[] | null || []).map((item) => ({
+        ...item,
+        driver_name: item.drivers?.full_name ?? "Unknown Driver",
+      }))
+    );
+  }, [platformId]);
 
   async function updateTrip(trip: Trip, status?: string) {
     if (!platformId) {
@@ -135,6 +204,7 @@ export default function TripsPage() {
         vehicle_registration: trip.vehicle_registration,
         status: status || trip.status,
       })
+      .eq("platform_id", platformId)
       .eq("id", trip.id);
 
     if (error) {
@@ -151,26 +221,6 @@ export default function TripsPage() {
     }
 
     loadTrips();
-  }
-
-  async function startTrip(trip: Trip) {
-    await updateTrip(trip, "In Progress");
-  }
-
-  async function completeTrip(trip: Trip) {
-    await updateTrip(trip, "Completed");
-  }
-
-  async function cancelTrip(trip: Trip) {
-    await updateTrip(trip, "Cancelled");
-  }
-
-  async function saveDriver(trip: Trip) {
-    await updateTrip(trip);
-  }
-
-  function saveVehicle(trip: Trip) {
-    // Vehicle assignment is persisted together with driver assignment.
   }
 
   async function createAssignmentNotifications(trip: Trip) {
@@ -288,28 +338,27 @@ export default function TripsPage() {
   }, []);
 
   useEffect(() => {
+    if (!platformId) return;
+
     const interval = setInterval(() => {
       loadLiveDrivers();
     }, 10000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [loadLiveDrivers, platformId]);
 
   useEffect(() => {
     if (!platformId) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTrips();
     loadLiveDrivers();
-  }, [platformId]);
+  }, [loadLiveDrivers, loadTrips, page, platformId]);
 
   const filteredTrips = trips.filter((trip) => {
     const text = `${trip.trip_code} ${trip.trip_date} ${trip.shift} ${trip.area} ${trip.driver_name} ${trip.vehicle_name} ${trip.vehicle_registration} ${trip.status}`.toLowerCase();
     return text.includes(search.toLowerCase());
   });
-
-  const confirmedTrips = trips.filter((trip) => trip.status === "Confirmed").length;
-  const inProgressTrips = trips.filter((trip) => trip.status === "In Progress").length;
-  const completedTrips = trips.filter((trip) => trip.status === "Completed").length;
 
   return (
     <AdminLayout>
@@ -325,22 +374,22 @@ export default function TripsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
           <div className="bg-white rounded-xl shadow p-5">
             <p className="font-bold text-gray-600">Total Trips</p>
-            <p className="text-4xl font-bold text-[#061B33]">{trips.length}</p>
+            <p className="text-4xl font-bold text-[#061B33]">{totalTripsCount}</p>
           </div>
 
           <div className="bg-orange-50 rounded-xl shadow p-5">
             <p className="font-bold text-gray-600">Confirmed</p>
-            <p className="text-4xl font-bold text-orange-500">{confirmedTrips}</p>
+            <p className="text-4xl font-bold text-orange-500">{confirmedTripsCount}</p>
           </div>
 
           <div className="bg-blue-50 rounded-xl shadow p-5">
             <p className="font-bold text-gray-600">In Progress</p>
-            <p className="text-4xl font-bold text-blue-600">{inProgressTrips}</p>
+            <p className="text-4xl font-bold text-blue-600">{inProgressTripsCount}</p>
           </div>
 
           <div className="bg-green-50 rounded-xl shadow p-5">
             <p className="font-bold text-gray-600">Completed</p>
-            <p className="text-4xl font-bold text-green-600">{completedTrips}</p>
+            <p className="text-4xl font-bold text-green-600">{completedTripsCount}</p>
           </div>
         </div>
 
@@ -518,8 +567,9 @@ export default function TripsPage() {
       alert("Trip dispatched successfully.");
 
       loadTrips();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Dispatch failed.";
+      alert(message);
     }
   }}
   className="bg-orange-500 text-white px-5 py-3 rounded-lg font-bold"
@@ -587,6 +637,13 @@ export default function TripsPage() {
             </TripCard>
             ))}
           </div>
+
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={totalTripsCount}
+            onPageChange={setPage}
+          />
         </div>
       </main>
     </AdminLayout>

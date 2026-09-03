@@ -4,11 +4,21 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
+type AgentRow = {
+  id: string;
+  agent_name?: string | null;
+  name?: string | null;
+  area?: string | null;
+  shift?: string | null;
+  pickup_address?: string | null;
+  home_address?: string | null;
+};
+
 export default function RoutePlanningPage() {
   const [planningDate, setPlanningDate] = useState("");
   const [shift, setShift] = useState("");
   const [planningMode, setPlanningMode] = useState("By Area");
-  const [agents, setAgents] = useState<any[]>([]);
+  const [agents, setAgents] = useState<AgentRow[]>([]);
 
   const loadAgents = async () => {
     const { data } = await supabase
@@ -20,6 +30,7 @@ export default function RoutePlanningPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAgents();
   }, []);
 

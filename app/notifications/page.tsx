@@ -26,7 +26,7 @@ export default function NotificationsPage() {
     const userPlatform = await getUserPlatform();
 
     if (!userPlatform) {
-      window.location.href = "/login";
+      window.location.replace("/login");
       return;
     }
 
@@ -84,6 +84,7 @@ const { data, error } = await supabase
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadNotifications();
   }, []);
 

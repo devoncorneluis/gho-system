@@ -36,6 +36,7 @@ export interface SlaMetrics {
 }
 
 export interface ExecutiveMetrics {
+  revenue: number;
   totalTrips: number;
   activeTrips: number;
   completedTrips: number;

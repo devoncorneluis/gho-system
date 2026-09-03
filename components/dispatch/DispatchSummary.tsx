@@ -15,7 +15,7 @@ export default function DispatchSummary({
   return (
     <div className="rounded-xl bg-gradient-to-r from-[#061B33] to-blue-700 p-6 text-white shadow-lg">
       <h2 className="text-3xl font-bold">
-        🚀 Today's Dispatch Summary
+        🚀 Today&apos;s Dispatch Summary
       </h2>
       <div className="mt-6 grid grid-cols-2 gap-6 md:grid-cols-4">
         <div>

@@ -1,5 +1,4 @@
 "use client";
-import PlatformCards from "../../components/super-admin/PlatformCards";
 import ExecutiveKpiCards from "../../components/super-admin/ExecutiveKpiCards";
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
@@ -192,41 +191,58 @@ async function loadDashboard() {
       trips.data?.filter(
         (t) =>
           t.status === "started" ||
-          t.status === "en_route"
+          t.status === "en_route" ||
+          t.status === "Assigned" ||
+          t.status === "In Progress"
       ).length ?? 0,
 
     completedTrips:
       trips.data?.filter(
-        (t) => t.status === "completed"
+        (t) =>
+          t.status === "completed" ||
+          t.status === "Completed"
       ).length ?? 0,
 
     onlineDrivers:
       drivers.data?.filter(
-        (d) => d.availability_status === "Online"
+        (d) =>
+          d.availability_status === "Online" ||
+          d.availability_status === "Available" ||
+          d.availability_status === "On Trip"
       ).length ?? 0,
 
     activeVehicles:
       vehicles.data?.filter(
-        (v) => v.status === "Active"
+        (v) =>
+          v.status === "Active" ||
+          v.status === "Available"
       ).length ?? 0,
 
     pendingBilling:
       billing.data?.filter(
-        (b) => b.billing_status === "pending"
+        (b) =>
+          b.billing_status === "pending" ||
+          b.billing_status === "Pending"
       ).length ?? 0,
 
     pendingPayroll:
       payroll.data?.filter(
-        (p) => p.payroll_status === "pending"
+        (p) =>
+          p.payroll_status === "pending" ||
+          p.payroll_status === "Pending"
       ).length ?? 0,
 
     emergencies:
       emergencies.data?.filter(
-        (e) => e.status === "active"
+        (e) =>
+          e.status === "active" ||
+          e.status === "Active" ||
+          e.status === "Open"
       ).length ?? 0,
   });
 }
 useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   loadPlatforms();
   loadDashboard();
 }, []);

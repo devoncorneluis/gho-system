@@ -1,16 +1,15 @@
 "use client";
-
-import { useEffect, useState } from "react";
+import { startTrip } from "../../lib/driver/startTrip";
+import { completeTrip } from "../../lib/driver/completeTrip";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import {
   updateTripStatus as dispatchUpdateTripStatus,
-  acceptDriverDispatch,
-  rejectDriverDispatch,
   arriveAtPickup,
 } from "../../lib/dispatchService";
 import { TRIP_STATUS } from "../../lib/tripStatus";
-import { error } from "console";
+import { respondToTrip } from "../../lib/driver/respondToTrip";
 
 type Trip = {
   id: string;
@@ -52,24 +51,57 @@ type TripPassenger = {
   dropoff_time: string | null;
   pickup_status: string | null;
 };
-type LiveDriver = {
-  driver_id: string;
-  trip_id: string | null;
-  latitude: number;
-  longitude: number;
-  speed: number | null;
-  heading: number | null;
-  accuracy: number | null;
-  is_tracking: boolean;
-  updated_at: string;
-};
+
+function DriverProgressTimeline({ status }: { status: string | null }) {
+  const steps = [
+    { label: "Dispatch Received", status: "dispatched" },
+    { label: "Trip Accepted", status: "accepted" },
+    { label: "En Route", status: "en_route" },
+    { label: "Arrived at Pickup", status: "picking_up" },
+    { label: "In Transit", status: "in_transit" },
+    { label: "Completed", status: "completed" },
+  ];
+
+  const currentIndex = steps.findIndex(
+    (step) => step.status === (status || "")
+  );
+
+  return (
+    <div className="rounded-2xl border bg-gray-50 p-4 mt-6">
+      <h3 className="font-bold text-[#061B33] mb-3">
+        Trip Progress
+      </h3>
+
+      <div className="space-y-2">
+        {steps.map((step, index) => (
+          <div
+            key={step.status}
+            className="flex items-center gap-3"
+          >
+            <span className="text-lg">
+              {index <= currentIndex ? "✅" : "⬜"}
+            </span>
+
+            <span
+              className={
+                index <= currentIndex
+                  ? "font-semibold text-green-700"
+                  : "text-gray-500"
+              }
+            >
+              {step.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function DriverPage() {
   const [platformId, setPlatformId] = useState("");
-  const [userId, setUserId] = useState("");
   const [driver, setDriver] = useState<Driver | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [processing, setProcessing] = useState<string[]>([]);
   const [passengers, setPassengers] = useState<TripPassenger[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [tracking, setTracking] = useState(false);
@@ -77,7 +109,6 @@ export default function DriverPage() {
   const [locationMessage, setLocationMessage] = useState("");
   const [currentLatitude, setCurrentLatitude] = useState<number | null>(null);
 const [currentLongitude, setCurrentLongitude] = useState<number | null>(null);
-const [liveDrivers, setLiveDrivers] = useState<LiveDriver[]>([]);
 const [showIncidentMenu, setShowIncidentMenu] = useState(false);
 const incidentTypes = [
     "🚧 Road Closed",
@@ -89,12 +120,12 @@ const incidentTypes = [
     "⛽ Fuel Stop",
     "🛠 Other Issue",
   ];
-  async function setupDriver() {
+  const setupDriver = useCallback(async () => {
 
     const userPlatform = await getUserPlatform();
 
     if (!userPlatform) {
-      window.location.href = "/login";
+      window.location.replace("/login");
       return;
     }
 
@@ -109,14 +140,13 @@ const incidentTypes = [
 
     setDriver(driverData || null);
     setPlatformId(userPlatform.platformId);
-    setUserId(userPlatform.userId);
 
     if (driverData?.full_name) {
       await loadTrips(userPlatform.platformId, driverData.full_name);
     }
 
     await loadPassengers(userPlatform.platformId);
-  }
+  }, []);
 
   async function loadTrips(activePlatformId: string, driverName: string) {
     const { data, error } = await supabase
@@ -124,7 +154,13 @@ const incidentTypes = [
       .select("*")
       .eq("platform_id", activePlatformId)
       .eq("driver_name", driverName)
-      .in("status", ["dispatched", "started"])
+      .in("status", [
+        "Assigned",
+        "Accepted",
+        "In Progress",
+        "dispatched",
+        "started",
+      ])
       .order("trip_date", { ascending: true });
 
     if (error) {
@@ -134,40 +170,6 @@ const incidentTypes = [
 
     setTrips(data || []);
   }
-  async function respondToDispatch(
-  tripId: string,
-  response: "accepted" | "rejected"
-) {
-  const { error } = await supabase
-    .from("trips")
-    .update({
-      driver_response: response,
-    })
-    .eq("id", tripId);
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  await loadTrips(platformId, driver?.full_name || "");
-}
-  async function loadLiveDrivers() {
-  const { data, error } = await supabase
-    .from("driver_locations")
-    .select(
-      "driver_id, trip_id, latitude, longitude, speed, heading, accuracy, is_tracking, updated_at"
-    )
-    .eq("is_tracking", true);
-
-  if (error) {
-    console.error(error);
-    return;
-  }
-
-  setLiveDrivers(data || []);
-}
-
   async function loadPassengers(activePlatformId: string) {
     const { data, error } = await supabase
       .from("trip_passengers")
@@ -202,6 +204,7 @@ async function saveDriverLocation(
 const { data: existing } = await supabase
   .from("driver_locations")
   .select("id")
+  .eq("platform_id", platformId)
   .eq("driver_id", driver.id)
   .limit(1)
   .maybeSingle();
@@ -210,6 +213,7 @@ const { data: existing } = await supabase
 await supabase
   .from("driver_locations")
   .update({
+    platform_id: platformId,
     trip_id: tripId,
     latitude,
     longitude,
@@ -222,6 +226,7 @@ await supabase
   .eq("id", existing.id);
     } else {
 await supabase.from("driver_locations").insert({
+  platform_id: platformId,
   driver_id: driver.id,
   trip_id: tripId,
   latitude,
@@ -235,6 +240,7 @@ await supabase.from("driver_locations").insert({
     }
 
 await supabase.from("driver_location_history").insert({
+  platform_id: platformId,
   driver_id: driver.id,
   trip_id: tripId,
   latitude,
@@ -295,6 +301,7 @@ async function stopGpsTracking() {
         is_tracking: false,
         updated_at: new Date().toISOString(),
       })
+      .eq("platform_id", platformId)
       .eq("driver_id", driver.id);
 
     if (error) {
@@ -357,8 +364,8 @@ if (nextStatus === TRIP_STATUS.COMPLETED && driver) {
 }
 
 setupDriver();
-  } catch (err: any) {
-    alert(err.message);
+  } catch (err: unknown) {
+    alert(err instanceof Error ? err.message : "Unable to update trip status.");
   }
 }
 
@@ -374,64 +381,53 @@ async function handleArriveAtPickup(trip: Trip) {
     );
 
     await setupDriver();
-  } catch (err: any) {
-    alert(err.message);
+  } catch (err: unknown) {
+    alert(err instanceof Error ? err.message : "Unable to arrive at pickup.");
   }
 }
 
   async function acceptTrip(trip: Trip) {
-    if (!trip.status) {
-      alert("This trip has no current status.");
-      return;
-    }
-
-    const prev = trips.find((t) => t.id === trip.id) || null;
-    setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? { ...t, driver_name: t.driver_name, status: t.status, } : t)));
-    // optimistic set driver_response
-    setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? { ...t, driver_response: "accepted" } : t)));
-    setProcessing((s) => (s.includes(trip.id) ? s : [...s, trip.id]));
-
     try {
-      await acceptDriverDispatch(trip.id, platformId, userId);
-    } catch (error: any) {
+      await respondToTrip({
+        platformId,
+        tripId: trip.id,
+        response: "Accepted",
+        driverName: trip.driver_name ?? "Driver",
+      });
+
+      await loadTrips(platformId, driver?.full_name ?? "");
+    } catch (error) {
       console.error(error);
-      // revert
-      if (prev) {
-        setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? prev : t)));
-      }
       alert("Unable to accept trip.");
-    } finally {
-      setProcessing((s) => s.filter((x) => x !== trip.id));
     }
   }
 
   async function rejectTrip(trip: Trip) {
-    if (!trip.status) {
-      alert("This trip has no current status.");
-      return;
-    }
-
-    const prev = trips.find((t) => t.id === trip.id) || null;
-    setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? { ...t, driver_response: "rejected" } : t)));
-    setProcessing((s) => (s.includes(trip.id) ? s : [...s, trip.id]));
-
     try {
-      await rejectDriverDispatch(trip.id, platformId, userId);
-    } catch (error: any) {
+      await respondToTrip({
+        platformId,
+        tripId: trip.id,
+        response: "Rejected",
+        driverName: trip.driver_name ?? "Driver",
+      });
+
+      await loadTrips(platformId, driver?.full_name ?? "");
+    } catch (error) {
       console.error(error);
-      if (prev) {
-        setTrips((prevList) => prevList.map((t) => (t.id === trip.id ? prev : t)));
-      }
       alert("Unable to reject trip.");
-    } finally {
-      setProcessing((s) => s.filter((x) => x !== trip.id));
     }
   }
 
   async function updatePassengerStatus(passengerId: string, status: string) {
+    if (!platformId) {
+      alert("Platform not loaded yet.");
+      return;
+    }
+
     const { error } = await supabase
       .from("trip_passengers")
       .update({ pickup_status: status })
+      .eq("platform_id", platformId)
       .eq("id", passengerId);
 
     if (error) {
@@ -496,51 +492,6 @@ if (
     const value = status || "assigned";
     return value.toLowerCase();
   }
-function DriverProgressTimeline({ status }: { status: string | null }) {
-  const steps = [
-    { label: "Dispatch Received", status: "dispatched" },
-    { label: "Trip Accepted", status: "accepted" },
-    { label: "En Route", status: "en_route" },
-    { label: "Arrived at Pickup", status: "picking_up" },
-    { label: "In Transit", status: "in_transit" },
-    { label: "Completed", status: "completed" },
-  ];
-
-  const currentIndex = steps.findIndex(
-    (step) => step.status === (status || "")
-  );
-
-  return (
-    <div className="rounded-2xl border bg-gray-50 p-4 mt-6">
-      <h3 className="font-bold text-[#061B33] mb-3">
-        Trip Progress
-      </h3>
-
-      <div className="space-y-2">
-        {steps.map((step, index) => (
-          <div
-            key={step.status}
-            className="flex items-center gap-3"
-          >
-            <span className="text-lg">
-              {index <= currentIndex ? "✅" : "⬜"}
-            </span>
-
-            <span
-              className={
-                index <= currentIndex
-                  ? "font-semibold text-green-700"
-                  : "text-gray-500"
-              }
-            >
-              {step.label}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
   function createSupportTicket() {
     alert("Support ticket feature coming soon.");
   }
@@ -581,11 +532,44 @@ longitude: currentLongitude,
 }
   useEffect(() => {
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setupDriver();
 
-  }, []);
+  }, [setupDriver]);
 
   const driverName = driver?.full_name || "Driver";
+
+  async function handleStartTrip(trip: Trip) {
+    try {
+      await startTrip({
+        platformId,
+        tripId: trip.id,
+        tripCode: trip.trip_code ?? "Unknown Trip",
+        driverName,
+      });
+
+      await loadTrips(platformId, driverName);
+    } catch (error) {
+      console.error(error);
+      alert("Unable to start trip.");
+    }
+  }
+
+  async function handleCompleteTrip(trip: Trip) {
+    try {
+      await completeTrip({
+        platformId,
+        tripId: trip.id,
+        tripCode: trip.trip_code ?? "Unknown Trip",
+        driverName,
+      });
+
+      await loadTrips(platformId, driverName);
+    } catch (error) {
+      console.error(error);
+      alert("Unable to complete trip.");
+    }
+  }
 
   const activeTrips = trips.filter(
     (trip) => trip.status !== "Completed" && trip.status !== "Cancelled"
@@ -691,36 +675,40 @@ longitude: currentLongitude,
 
                     <div className="grid grid-cols-2 gap-3 mt-5">
                       <div className="flex gap-2">
-                        <button
-onClick={async () => {
-  setSelectedTripId(trip.id);
-  await updateTripStatus(
-    trip,
-TRIP_STATUS.EN_ROUTE
-  );
-}}
-                          className="border rounded-xl px-3 py-3 font-bold"
-                        >
-                          Start Trip
-                        </button>
+                        {trip.status === "Accepted" && (
+                          <button
+                            onClick={() => handleStartTrip(trip)}
+                            className="mt-4 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white"
+                          >
+                            Start Trip
+                          </button>
+                        )}
 
-                        {(trip.driver_response === null || trip.driver_response === "" || trip.driver_response === "pending") && (
-                          <>
+                        {trip.status === "In Progress" && (
+                          <button
+                            onClick={() => handleCompleteTrip(trip)}
+                            className="mt-4 rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white"
+                          >
+                            Complete Trip
+                          </button>
+                        )}
+
+                        {trip.driver_response === "Pending" && (
+                          <div className="mt-4 flex gap-3">
                             <button
                               onClick={() => acceptTrip(trip)}
-                              disabled={processing.includes(trip.id)}
-                              className={`px-3 py-3 rounded-xl font-bold ${processing.includes(trip.id) ? "bg-gray-200 text-gray-400" : "bg-green-50 text-green-700"}`}
+                              className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white"
                             >
-                              Accept
+                              Accept Trip
                             </button>
+
                             <button
                               onClick={() => rejectTrip(trip)}
-                              disabled={processing.includes(trip.id)}
-                              className={`px-3 py-3 rounded-xl font-bold ${processing.includes(trip.id) ? "bg-gray-200 text-gray-400" : "bg-red-50 text-red-700"}`}
+                              className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white"
                             >
-                              Reject
+                              Reject Trip
                             </button>
-                          </>
+                          </div>
                         )}
                       </div>
 {trip.status === TRIP_STATUS.EN_ROUTE && (
@@ -942,10 +930,7 @@ onClick={() => {
     return;
   }
 
-  updateTripStatus(
-    selectedTrip,
-    TRIP_STATUS.COMPLETED
-  );
+  handleCompleteTrip(selectedTrip);
 }}
 
                 className="bg-[#061B33] text-white rounded-2xl p-4 font-bold w-full mt-6"

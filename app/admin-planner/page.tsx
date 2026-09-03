@@ -1,11 +1,17 @@
 "use client";
 import PlannerStats from "../../components/planner/PlannerStats";
-import { TRIP_STATUS } from "../../lib/tripStatus";
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import { supabase } from "../../lib/supabase";
 import { recordTripEvent } from "../../lib/tripEventService";
+import SmartDispatchPanel from "../../components/dispatch/SmartDispatchPanel";
+import {
+  recommendDispatch,
+  Recommendation,
+  DriverCandidate,
+  VehicleCandidate,
+} from "../../lib/dispatch/recommendationEngine";
 type Agent = {
   id: string;
 
@@ -35,6 +41,7 @@ type RouteGroup = {
 type Driver = {
   id: string;
   full_name: string;
+  availability_status: string | null;
 };
 
 type Vehicle = {
@@ -44,15 +51,7 @@ type Vehicle = {
   registration_number: string;
   passenger_limit: number;
   assigned_driver: string | null;
-};
-
-type DriverVehicleSelection = {
-  driver_id: string;
-  driver_name: string;
-  vehicle_id: string;
-  vehicle_name: string;
-  vehicle_type: string | null;
-  registration_number: string;
+  availability_status: string | null;
 };
 
 export default function DailyTransportPlannerPage() {
@@ -63,7 +62,7 @@ const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({
 const [drivers, setDrivers] = useState<Driver[]>([]);
 const [assignedDrivers, setAssignedDrivers] = useState<string[]>([]);
 const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [editingTrips, setEditingTrips] = useState<Record<string, boolean>>({});const [editedTripNames, setEditedTripNames] = useState<Record<string, string>>({});
+  const [, setEditingTrips] = useState<Record<string, boolean>>({});const [editedTripNames, setEditedTripNames] = useState<Record<string, string>>({});
   const [editedPickupTimes, setEditedPickupTimes] = useState<Record<string, string>>({});
   const [extraAgentNames, setExtraAgentNames] = useState<Record<string, string>>({});
 const [estimatedKm, setEstimatedKm] = useState<Record<string, string>>({});
@@ -72,7 +71,9 @@ const [adminCapacity, setAdminCapacity] = useState<Record<string, string>>({});;
   const [selectedRouteGroupId, setSelectedRouteGroupId] = useState("");
   const [planDate, setPlanDate] = useState(new Date().toISOString().slice(0, 10));
   const [shift, setShift] = useState("06:00 Shift");
-
+const [, setRecommendations] = useState<Recommendation[]>([]);
+const [selectedRecommendation, setSelectedRecommendation] =
+  useState<Recommendation | null>(null);
   async function loadRouteGroups(activePlatformId: string) {
     const { data, error } = await supabase
       .from("route_groups")
@@ -126,7 +127,7 @@ console.log("AGENTS DATA:", data);
   async function loadDriversAndVehicles(activePlatformId: string) {
 const { data: driverData, error: driverError } = await supabase
   .from("drivers")
-  .select("id, full_name")
+  .select("id, full_name, availability_status")
   .eq("platform_id", activePlatformId)
   .eq("status", "Available")
   .eq("availability_status", "Available");
@@ -143,7 +144,8 @@ const { data: vehicleData, error: vehicleError } = await supabase
     vehicle_type,
     registration_number,
     passenger_limit,
-    assigned_driver
+    assigned_driver,
+    availability_status
   `)
   .eq("platform_id", activePlatformId)
   .eq("status", "Available")
@@ -213,6 +215,8 @@ const area = agent.pickup_area || "Unknown Area";
           return groups;
         }, {});
 
+  const selectedPassengers = agents;
+
 function suggestedVehicle(count: number) {
   const available = vehicles
     .filter((v) => v.passenger_limit >= count)
@@ -233,32 +237,6 @@ function getSuggestedDriverId() {
   return available?.id || "";
 }
 
-function suggestedDriver(vehicleName: string) {
-  const vehicle = vehicles.find((v) =>
-    vehicleName.startsWith(v.vehicle_name)
-  );
-
-  if (!vehicle) {
-    return null;
-  }
-
-  if (vehicle.assigned_driver) {
-    const assigned = drivers.find(
-      (d) => d.full_name === vehicle.assigned_driver
-    );
-
-    if (
-      assigned &&
-      !assignedDrivers.includes(assigned.id)
-    ) {
-      return assigned;
-    }
-  }
-
-  return drivers.find(
-    (d) => !assignedDrivers.includes(d.id)
-  );
-}
 function splitIntoTrips(areaAgents: Agent[]) {
   const trips: Agent[][] = [];
 
@@ -280,6 +258,43 @@ function splitIntoTrips(areaAgents: Agent[]) {
   return trips;
 }
 
+function generateRecommendations() {
+  const driverCandidates: DriverCandidate[] = drivers.map(
+    (driver) => ({
+      id: driver.id,
+      name: driver.full_name ?? "Unknown Driver",
+      available:
+        driver.availability_status === "Available",
+      onDuty: true,
+      hasActiveTrip: false,
+      hasIncident: false,
+      gpsFresh: true,
+    })
+  );
+
+  const vehicleCandidates: VehicleCandidate[] =
+    vehicles.map((vehicle) => ({
+      id: vehicle.id,
+      name: vehicle.vehicle_name ?? "Vehicle",
+      capacity: vehicle.passenger_limit ?? 4,
+      available:
+        vehicle.availability_status === "Available",
+      assigned: false,
+    }));
+
+  const passengerCount =
+    selectedPassengers.length || 1;
+
+  const result = recommendDispatch(
+    driverCandidates,
+    vehicleCandidates,
+    passengerCount
+  );
+
+  setRecommendations(result);
+  setSelectedRecommendation(result[0] ?? null);
+}
+
   function startEditTrip(tripKey: string) {
     setEditingTrips((current) => ({ ...current, [tripKey]: true }));
     setEditedTripNames((current) => ({ ...current, [tripKey]: current[tripKey] || tripKey }));
@@ -288,12 +303,6 @@ function splitIntoTrips(areaAgents: Agent[]) {
       [tripKey]: current[tripKey] || (shift.includes("06:00") ? "05:00" : "17:00"),
     }));
   }
-
-  function saveEditTrip(tripKey: string) {
-    setEditingTrips((current) => ({ ...current, [tripKey]: false }));
-    alert("Trip changes saved");
-  }
-
 
 
   function addMissingAgent(tripKey: string) {
@@ -363,11 +372,6 @@ if (!vehicle) {
   return;
 }
 
-
-const driverName = driver.full_name;
-const vehicleName = vehicle.vehicle_name;
-const vehicleRegistration = vehicle.registration_number;
-const vehicleType = vehicle.vehicle_type;
 
 const capacity = vehicle.passenger_limit;
 
@@ -623,6 +627,13 @@ Generated by GHO
   Refresh Plan
 
 </button>
+
+<button
+  onClick={generateRecommendations}
+  className="rounded-xl bg-green-600 px-6 py-3 font-semibold text-white"
+>
+  Smart Recommend
+</button>
 </div>
 
 <PlannerStats
@@ -630,6 +641,19 @@ Generated by GHO
   plannedTrips={Object.keys(groupedAgents).length}
   planDate={planDate}
 />
+
+{selectedRecommendation && (
+  <div className="mt-8">
+    <SmartDispatchPanel
+      recommendation={selectedRecommendation}
+      onAssign={() => {
+        alert(
+          `Assigned ${selectedRecommendation.driver.name} with ${selectedRecommendation.vehicle.name}`
+        );
+      }}
+    />
+  </div>
+)}
 
 
         <div className="mt-6 space-y-5">

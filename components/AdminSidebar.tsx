@@ -15,6 +15,7 @@ const links = [
   { name: "🚨 Emergency", href: "/emergency-dashboard" },
   { name: "🔔 Notifications", href: "/notifications" },
   { name: "📊 Reports", href: "/reports" },
+  { name: "✅ Production Readiness", href: "/production-readiness" },
 ];
 
 export default function AdminSidebar() {

@@ -23,6 +23,13 @@ const toneMap: Record<string, string> = {
   Rejected: "bg-rose-100 text-rose-700",
 };
 
+type ResponseTripRow = {
+  id: string;
+  trip_code: string | null;
+  driver_name: string | null;
+  driver_response: string | null;
+};
+
 export default function DriverResponsePanel() {
   const [responses, setResponses] = useState<ResponseItem[]>(fallbackResponses);
 
@@ -48,7 +55,7 @@ export default function DriverResponsePanel() {
           return;
         }
 
-        const mapped = data.map((trip: any) => ({
+        const mapped = ((data as ResponseTripRow[] | null) ?? []).map((trip) => ({
           driver: trip.driver_name || "Unassigned",
           trip: trip.trip_code || trip.id,
           status: (trip.driver_response || "pending").charAt(0).toUpperCase() + (trip.driver_response || "pending").slice(1),

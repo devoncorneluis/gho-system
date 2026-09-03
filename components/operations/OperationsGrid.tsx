@@ -19,6 +19,7 @@ import RecommendationDrawer from "./RecommendationDrawer";
 import RecommendationPanel from "./RecommendationPanel";
 import WorkflowQueuePanel from "./WorkflowQueuePanel";
 import LiveFleetStatusPanel from "./LiveFleetStatusPanel";
+import LiveDispatchQueuePanel from "./LiveDispatchQueuePanel";
 type SummaryCard = {
   key: keyof ControlTowerSnapshot["summaryCards"];
   label: string;
@@ -179,6 +180,7 @@ export default function OperationsGrid() {
   <OperationsMap />
 </div>
 
+<LiveDispatchQueuePanel />
 <EnterpriseIntelligencePanel />
 
 <div className="grid gap-6 xl:grid-cols-2">

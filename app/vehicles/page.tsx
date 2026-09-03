@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import AdminLayout from "../../components/AdminLayout";
@@ -37,8 +38,7 @@ const [assignedDriver, setAssignedDriver] = useState("");
 const assignedVehicles = vehicles.filter(v => v.assigned_driver).length;
 const unassignedVehicles = vehicles.filter(v => !v.assigned_driver).length;
 const availableVehicles = vehicles.filter(v => v.status === "Available").length;
-const maintenanceVehicles = vehicles.filter(v => v.status === "Maintenance").length;
-  async function loadVehicles() {
+  const loadVehicles = useCallback(async () => {
     if (!platformId) return;
 
     const { data, error } = await supabase
@@ -53,9 +53,9 @@ const maintenanceVehicles = vehicles.filter(v => v.status === "Maintenance").len
     }
 
     setVehicles(data || []);
-  }
+  }, [platformId]);
 
-async function loadDrivers() {
+const loadDrivers = useCallback(async () => {
   if (!platformId) return;
 
   const { data, error } = await supabase
@@ -70,7 +70,7 @@ async function loadDrivers() {
   }
 
   setDrivers(data ?? []);
-}
+}, [platformId]);
 
 
 
@@ -134,6 +134,7 @@ function getDriverName(driverId: string | null) {
   const { data: existingVehicle, error: existingError } = await supabase
     .from("vehicles")
     .select("vehicle_name")
+    .eq("platform_id", platformId)
     .eq("assigned_driver", assignedDriver)
     .maybeSingle();
 
@@ -196,9 +197,10 @@ useEffect(() => {
   useEffect(() => {
     if (!platformId) return;
 
+// eslint-disable-next-line react-hooks/set-state-in-effect
 loadVehicles();
 loadDrivers();
-  }, [platformId]);
+  }, [loadDrivers, loadVehicles, platformId]);
 
   return (
     <AdminLayout>
@@ -331,9 +333,11 @@ loadDrivers();
               )}
 
               {vehiclePhoto && (
-                <img
+                <Image
                   src={vehiclePhoto}
                   alt="Vehicle preview"
+                  width={800}
+                  height={320}
                   className="mt-3 w-full h-40 object-cover rounded-lg border"
                 />
               )}
@@ -363,9 +367,11 @@ loadDrivers();
               >
                 <div className="h-44 bg-gray-200">
                   {vehicle.vehicle_photo ? (
-                    <img
+                    <Image
                       src={vehicle.vehicle_photo}
                       alt={vehicle.vehicle_name}
+                      width={640}
+                      height={176}
                       className="w-full h-full object-cover"
                     />
                   ) : (

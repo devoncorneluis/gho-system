@@ -5,16 +5,23 @@ import { getUserPlatform } from "../../lib/getUserPlatform";
 import { supabase } from "../../lib/supabase";
 
 type FeedItem = {
+  id: string;
   time: string;
   title: string;
   detail: string;
 };
 
 const fallbackFeed: FeedItem[] = [
-  { time: "2m ago", title: "Vehicle assigned", detail: "V-204 moved to TRIP-112" },
-  { time: "6m ago", title: "Driver acknowledged", detail: "Maya accepted dispatch" },
-  { time: "11m ago", title: "SLA warning", detail: "One trip is trending late" },
+  { id: "fallback-1", time: "2m ago", title: "Vehicle assigned", detail: "V-204 moved to TRIP-112" },
+  { id: "fallback-2", time: "6m ago", title: "Driver acknowledged", detail: "Maya accepted dispatch" },
+  { id: "fallback-3", time: "11m ago", title: "SLA warning", detail: "One trip is trending late" },
 ];
+
+type ActivityTripRow = {
+  id: string;
+  trip_code: string | null;
+  status: string | null;
+};
 
 export default function ActivityFeedPanel() {
   const [feed, setFeed] = useState<FeedItem[]>(fallbackFeed);
@@ -40,7 +47,8 @@ export default function ActivityFeedPanel() {
           return;
         }
 
-        const mapped = data.map((trip: any, index: number) => ({
+        const mapped = ((data as ActivityTripRow[] | null) ?? []).map((trip, index: number) => ({
+          id: trip.id,
           time: `${index + 1}m ago`,
           title: trip.trip_code || `Trip ${trip.id}`,
           detail: trip.status || "Updated",
@@ -71,7 +79,7 @@ export default function ActivityFeedPanel() {
 
       <div className="mt-6 space-y-3">
         {feed.map((item) => (
-          <div key={`${item.time}-${item.title}`} className="rounded-2xl border border-gray-100 bg-slate-50 px-4 py-3">
+          <div key={item.id} className="rounded-2xl border border-gray-100 bg-slate-50 px-4 py-3">
             <div className="flex items-center justify-between">
               <p className="font-semibold text-[#061B33]">{item.title}</p>
               <span className="text-sm text-gray-500">{item.time}</span>

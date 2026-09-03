@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../../lib/supabase";
 
@@ -25,55 +25,7 @@ const [tracking, setTracking] = useState(false);
   const [passengers, setPassengers] = useState<Passenger[]>([]);
   const [loading, setLoading] = useState(true);
 const [tripStatus, setTripStatus] = useState<string>("");
-  useEffect(() => {
-    loadPassengers();
-
-    const interval = setInterval(loadPassengers, 10000);
-
-    return () => clearInterval(interval);
-  }, [id]);
-useEffect(() => {
-  if (!tracking) return;
-
-  if (!navigator.geolocation) {
-    alert("GPS is not supported on this device.");
-    return;
-  }
-
-  const watchId = navigator.geolocation.watchPosition(
-    async (position) => {
-const {
-  data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) return;
-
-await supabase
-  .from("driver_locations")
-  .upsert({
-    driver_id: user.id,
-    latitude: position.coords.latitude,
-    longitude: position.coords.longitude,
-    updated_at: new Date().toISOString(),
-  });
-      console.log(
-        "Driver location:",
-        position.coords.latitude,
-        position.coords.longitude
-      );
-    },
-    (error) => {
-      console.error(error);
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 5000,
-    }
-  );
-
-  return () => navigator.geolocation.clearWatch(watchId);
-}, [tracking]);
-  async function loadPassengers() {
+  const loadPassengers = useCallback(async () => {
     setLoading(true);
 
     const { data, error } = await supabase
@@ -115,8 +67,73 @@ await supabase
 
     setPassengers(updated);
     setLoading(false);
+  }, [id]);
+
+  const loadTripStatus = useCallback(async () => {
+    const { data } = await supabase
+      .from("trips")
+      .select("trip_status")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (data?.trip_status) {
+      setTripStatus(String(data.trip_status).toLowerCase());
+    }
+  }, [id]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadPassengers();
+    void loadTripStatus();
+
+    const interval = setInterval(() => {
+      void loadPassengers();
+      void loadTripStatus();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [id, loadPassengers, loadTripStatus]);
+useEffect(() => {
+  if (!tracking) return;
+
+  if (!navigator.geolocation) {
+    alert("GPS is not supported on this device.");
+    return;
   }
 
+  const watchId = navigator.geolocation.watchPosition(
+    async (position) => {
+const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) return;
+
+await supabase
+  .from("driver_locations")
+  .upsert({
+    driver_id: user.id,
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude,
+    updated_at: new Date().toISOString(),
+  });
+      console.log(
+        "Driver location:",
+        position.coords.latitude,
+        position.coords.longitude
+      );
+    },
+    (error) => {
+      console.error(error);
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 5000,
+    }
+  );
+
+  return () => navigator.geolocation.clearWatch(watchId);
+}, [tracking]);
   async function markPassengerPickedUp(passengerId: string) {
     const { error } = await supabase
       .from("trip_passengers")
@@ -147,6 +164,7 @@ async function startTrip() {
   }
 
   alert("Trip started.");
+  setTripStatus("started");
   setTracking(true);
 }
 
@@ -165,6 +183,7 @@ async function completeTrip() {
   }
 
 alert("Trip completed.");
+setTripStatus("completed");
 
 router.push("/driver");
 }

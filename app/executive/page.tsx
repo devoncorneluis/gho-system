@@ -2,11 +2,25 @@
 
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
+import ExecutiveAlerts from "../../components/executive/ExecutiveAlerts";
+import type { ExecutiveAlert } from "../../components/executive/ExecutiveAlerts";
 import { getExecutiveMetrics } from "../../lib/analytics/metricsService";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 
 export default function ExecutiveDashboardPage() {
-  const [metrics, setMetrics] = useState({
+  const [metrics, setMetrics] = useState<{
+    executiveAlerts: ExecutiveAlert[];
+    revenue: number;
+    totalTrips: number;
+    activeTrips: number;
+    completedTrips: number;
+    fleetUtilisation: number;
+    driverAcceptanceRate: number;
+    slaCompliance: number;
+    activeEmergencies: number;
+  }>({
+    executiveAlerts: [],
+    revenue: 0,
     totalTrips: 0,
     activeTrips: 0,
     completedTrips: 0,
@@ -48,7 +62,7 @@ export default function ExecutiveDashboardPage() {
         <div className="mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-semibold text-gray-500">Revenue</p>
-            <p className="mt-3 text-3xl font-black text-[#061B33]">$218k</p>
+            <p className="mt-3 text-3xl font-black text-[#061B33]">R {metrics.revenue.toLocaleString()}</p>
           </div>
           <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-semibold text-gray-500">Fleet utilization</p>
@@ -60,7 +74,16 @@ export default function ExecutiveDashboardPage() {
           </div>
           <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-semibold text-gray-500">Trip success</p>
-            <p className="mt-3 text-3xl font-black text-[#061B33]">{metrics.completedTrips > 0 ? Math.round((metrics.completedTrips / metrics.totalTrips) * 100) : 0}%</p>
+            <p className="mt-3 text-3xl font-black text-[#061B33]">
+              {metrics.totalTrips > 0
+                ? Math.round(
+                    (metrics.completedTrips /
+                      metrics.totalTrips) *
+                      100
+                  )
+                : 0}
+              %
+            </p>
           </div>
         </div>
 
@@ -73,6 +96,10 @@ export default function ExecutiveDashboardPage() {
             <p className="text-sm font-semibold text-gray-500">Active emergencies</p>
             <p className="mt-3 text-3xl font-black text-[#061B33]">{metrics.activeEmergencies}</p>
           </div>
+        </div>
+
+        <div className="mt-6">
+          <ExecutiveAlerts alerts={metrics.executiveAlerts} />
         </div>
       </main>
     </AdminLayout>

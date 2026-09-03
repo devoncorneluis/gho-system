@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import AdminLayout from "../../components/AdminLayout";
@@ -39,15 +40,20 @@ photo_url: string | null;
   availability_status: string | null;
 };
 
+type ManifestPassenger = {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  pickup_address: string | null;
+};
+
 export default function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
-const [manifestPassengers, setManifestPassengers] = useState<any[]>([]);
+const [manifestPassengers, setManifestPassengers] = useState<ManifestPassenger[]>([]);
 const [manifestTripCode, setManifestTripCode] = useState("");
 const [showManifest, setShowManifest] = useState(false);
-  const [driverNo, setDriverNo] = useState("");
-  const [driverCode, setDriverCode] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -58,14 +64,13 @@ const [registrationNumber, setRegistrationNumber] = useState("");
 const [vehicleType, setVehicleType] = useState("");
 const [vehicleColour, setVehicleColour] = useState("");
 const [passengerLimit, setPassengerLimit] = useState("");
-  const [assignedVehicleId, setAssignedVehicleId] = useState("");
   const [driverPhoto, setDriverPhoto] = useState("");
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [platformId, setPlatformId] = useState<string | null>(null);
 const [watchId, setWatchId] = useState<number | null>(null);
 
-  async function loadDrivers() {
+  const loadDrivers = useCallback(async () => {
     if (!platformId) return;
 
     const { data, error } = await supabase
@@ -80,9 +85,9 @@ const [watchId, setWatchId] = useState<number | null>(null);
     }
 
     setDrivers(data || []);
-  }
+  }, [platformId]);
 
-  async function loadVehicles() {
+  const loadVehicles = useCallback(async () => {
     if (!platformId) return;
 
     const { data, error } = await supabase
@@ -106,13 +111,7 @@ const [watchId, setWatchId] = useState<number | null>(null);
     }
 
     setVehicles(data || []);
-  }
-
-  function vehicleLabel(vehicleId: string | null) {
-    const vehicle = vehicles.find((item) => item.id === vehicleId);
-    if (!vehicle) return "No vehicle assigned";
-    return `${vehicle.vehicle_code || "VEH"} - ${vehicle.vehicle_name} - ${vehicle.registration_number}`;
-  }
+  }, [platformId]);
 function selectedVehicleInfo(vehicleId: string | null) {
   return vehicles.find((vehicle) => vehicle.id === vehicleId) || null;
 }
@@ -245,8 +244,6 @@ if (error) {
     console.error("Driver login creation failed", err);
   }
 
-setDriverNo("");
-setDriverCode("");
 setName("");
 setPhone("");
 setEmail("");
@@ -336,9 +333,10 @@ loadDrivers();
   useEffect(() => {
     if (!platformId) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDrivers();
     loadVehicles();
-  }, [platformId]);
+  }, [loadDrivers, loadVehicles, platformId]);
 
   return (
     <AdminLayout>
@@ -399,11 +397,13 @@ onChange={(e) => {
                 )}
 
 {editingDriver.photo_url && (
-  <img
+  <Image
     src={editingDriver.photo_url}
-                    alt={editingDriver.full_name}
-                    className="mt-3 w-32 h-32 object-cover rounded-2xl border"
-                  />
+    alt={editingDriver.full_name}
+    width={128}
+    height={128}
+    className="mt-3 w-32 h-32 object-cover rounded-2xl border"
+  />
                 )}
               </div>
 
@@ -539,9 +539,11 @@ onChange={(e) => {
   setDriverPhoto(preview);
 }} />
               {driverPhoto && (
-                <img
+                <Image
                   src={driverPhoto}
                   alt="Driver preview"
+                  width={128}
+                  height={128}
                   className="mt-3 w-32 h-32 object-cover rounded-2xl border"
                 />
               )}
@@ -610,9 +612,11 @@ Save Driver & Vehicle
 
           <div className="w-28 h-28 rounded-3xl overflow-hidden bg-gray-200 flex items-center justify-center">
             {driver.photo_url ? (
-              <img
+              <Image
                 src={driver.photo_url}
                 alt={driver.full_name}
+                width={112}
+                height={112}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -732,6 +736,7 @@ async (position) => {
   const { error: locationError } = await supabase
     .from("driver_locations")
     .upsert({
+      platform_id: platformId,
       driver_id: driver.id,
       trip_id: trip.id,
       latitude,
@@ -747,6 +752,7 @@ async (position) => {
   const { error: historyError } = await supabase
     .from("driver_location_history")
     .insert({
+      platform_id: platformId,
       driver_id: driver.id,
       trip_id: trip.id,
       latitude,
