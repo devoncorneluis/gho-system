@@ -1,7 +1,8 @@
 import type { IntelligencePrediction, IntelligenceTrip, IntelligenceVehicle } from "../core/intelligenceTypes";
+import { TRIP_STATUS } from "../../tripStatus";
 
 export function forecastFleetRequirement(trips: IntelligenceTrip[], vehicles: IntelligenceVehicle[]): IntelligencePrediction {
-  const activeTrips = trips.filter((trip) => trip.status !== "Completed" && trip.status !== "Cancelled").length;
+  const activeTrips = trips.filter((trip) => trip.status !== TRIP_STATUS.COMPLETED && trip.status !== TRIP_STATUS.CANCELLED).length;
   const availableVehicles = vehicles.filter((vehicle) => vehicle.status === "Available").length;
   const value = Math.max(0, activeTrips - availableVehicles);
 

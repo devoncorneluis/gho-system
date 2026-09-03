@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { TRIP_STATUS } from "../tripStatus";
 import type { FleetStatusItem } from "../automation/automationFacade";
 
 type DriverRow = {
@@ -59,8 +60,8 @@ export async function getFleetStatus(): Promise<FleetStatusItem[]> {
       typedTrips.find(
         (t) =>
           t.driver_id === driver.id &&
-          t.status !== "Completed" &&
-          t.status !== "Cancelled"
+          t.status !== TRIP_STATUS.COMPLETED &&
+          t.status !== TRIP_STATUS.CANCELLED
       ) ?? null;
 
     const location =

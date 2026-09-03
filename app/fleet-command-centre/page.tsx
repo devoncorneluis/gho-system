@@ -12,6 +12,7 @@ import { supabase } from "../../lib/supabase";
 import FleetSummaryCards from "../../components/fleet/FleetSummaryCards";
 import FleetStatusFilters from "../../components/fleet/FleetStatusFilters";
 import { getUserPlatform } from "../../lib/getUserPlatform";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 import { getFleetPriority } from "../../lib/fleet/fleetPriority";
 import { getRouteRisk } from "../../lib/fleet/routeRisk";
 import { getRouteDeviation } from "../../lib/fleet/routeDeviation";
@@ -619,7 +620,12 @@ const [
     .from("trips")
     .select("id", { count: "exact", head: true })
     .eq("platform_id", currentPlatformId)
-    .in("trip_status", ["Assigned", "Started", "In Progress"]),
+    .in("trip_status", [
+      TRIP_STATUS.ASSIGNED,
+      TRIP_STATUS.EN_ROUTE,
+      TRIP_STATUS.PICKING_UP,
+      TRIP_STATUS.IN_TRANSIT,
+    ]),
 
   loadDrivers(currentPlatformId),
   loadEmergencies(currentPlatformId),

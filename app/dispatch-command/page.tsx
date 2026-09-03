@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 
 type Trip = {
   id: string;
@@ -22,10 +23,10 @@ const [statusFilter, setStatusFilter] = useState("all");
 async function dispatchTrip(tripId: string) {
   const { error } = await supabase
     .from("trips")
-.update({
-status: "Dispatched",
-  dispatched_at: new Date().toISOString(),
-})
+    .update({
+      status: TRIP_STATUS.DISPATCHED,
+      dispatched_at: new Date().toISOString(),
+    })
     .eq("id", tripId);
 
   if (error) {
@@ -45,7 +46,7 @@ async function cancelTrip(id: string) {
   const { error } = await supabase
     .from("trips")
     .update({
-      status: "Cancelled",
+      status: TRIP_STATUS.CANCELLED,
     })
     .eq("id", id);
 
@@ -123,9 +124,9 @@ useEffect(() => {
 // Dashboard summary cards
 const activeTrips = trips.filter(
   (t) =>
-    t.status === "Dispatched" ||
-    t.status === "Accepted" ||
-    t.status === "In Progress"
+    t.status === TRIP_STATUS.DISPATCHED ||
+    t.status === TRIP_STATUS.ACCEPTED ||
+    t.status === TRIP_STATUS.IN_TRANSIT
 ).length;
 
 const awaitingDrivers = trips.filter(
@@ -137,7 +138,7 @@ const rejectedTrips = trips.filter(
 ).length;
 
 const completedTrips = trips.filter(
-  (t) => t.status === "Completed"
+  (t) => t.status === TRIP_STATUS.COMPLETED
 ).length;
 const filteredTrips = trips.filter((trip) => {
   const matchesSearch =
@@ -258,15 +259,15 @@ const filteredTrips = trips.filter((trip) => {
   <span
     className={`rounded-full px-3 py-1 text-sm font-semibold text-white
       ${
-        trip.status === "Assigned"
+        trip.status === TRIP_STATUS.ASSIGNED
           ? "bg-gray-500"
-          : trip.status === "Dispatched"
+          : trip.status === TRIP_STATUS.DISPATCHED
           ? "bg-orange-500"
-          : trip.status === "Accepted"
+          : trip.status === TRIP_STATUS.ACCEPTED
           ? "bg-blue-600"
-          : trip.status === "In Progress"
+          : trip.status === TRIP_STATUS.IN_TRANSIT
           ? "bg-indigo-600"
-          : trip.status === "Completed"
+          : trip.status === TRIP_STATUS.COMPLETED
           ? "bg-green-600"
           : "bg-red-500"
       }`}
@@ -279,15 +280,14 @@ const filteredTrips = trips.filter((trip) => {
               {trip.driver_response ?? "Awaiting"}
             </td>
 
-            <td className="p-3 text-center">
-<td className="p-3">
+<td className="p-3 text-center">
   <div className="flex flex-wrap justify-center gap-2">
     <button
       onClick={() => dispatchTrip(trip.id)}
       disabled={
-        trip.status === "Dispatched" ||
-        trip.status === "In Progress" ||
-        trip.status === "Completed"
+        trip.status === TRIP_STATUS.DISPATCHED ||
+        trip.status === TRIP_STATUS.IN_TRANSIT ||
+        trip.status === TRIP_STATUS.COMPLETED
       }
       className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:bg-gray-300"
     >
@@ -311,8 +311,8 @@ const filteredTrips = trips.filter((trip) => {
 <button
   onClick={() => cancelTrip(trip.id)}
   disabled={
-    trip.status === "Completed" ||
-    trip.status === "Cancelled"
+    trip.status === TRIP_STATUS.COMPLETED ||
+    trip.status === TRIP_STATUS.CANCELLED
   }
   className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-gray-300"
 >
@@ -320,7 +320,6 @@ const filteredTrips = trips.filter((trip) => {
 </button>
   </div>
 </td>
-            </td>
           </tr>
         ))}
 
@@ -354,11 +353,11 @@ const filteredTrips = trips.filter((trip) => {
       className="rounded-lg border p-3"
     >
       <option value="all">All Trips</option>
-      <option value="Assigned">Assigned</option>
-      <option value="Dispatched">Dispatched</option>
-      <option value="Accepted">Accepted</option>
-      <option value="In Progress">In Progress</option>
-      <option value="Completed">Completed</option>
+      <option value={TRIP_STATUS.ASSIGNED}>Assigned</option>
+      <option value={TRIP_STATUS.DISPATCHED}>Dispatched</option>
+      <option value={TRIP_STATUS.ACCEPTED}>Accepted</option>
+      <option value={TRIP_STATUS.IN_TRANSIT}>In Progress</option>
+      <option value={TRIP_STATUS.COMPLETED}>Completed</option>
     </select>
   </div>
 </div>

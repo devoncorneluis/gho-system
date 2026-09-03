@@ -182,7 +182,7 @@ function handlePrimaryAction(trip: DispatchTrip) {
       break;
 
     case "Assigned":
-      router.push(`/drivers?trip=${trip.id}`);
+      router.push(`/driver-fleet?trip=${trip.id}`);
       break;
 
     case "Delayed":

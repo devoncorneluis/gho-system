@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import ExecutiveAlerts from "../../components/executive/ExecutiveAlerts";
+import ExecutiveInsights from "../../components/executive/ExecutiveInsights";
+import OperationsOverview from "../../components/executive/OperationsOverview";
+import RevenueTrendCard from "../../components/executive/RevenueTrendCard";
 import type { ExecutiveAlert } from "../../components/executive/ExecutiveAlerts";
 import { getExecutiveMetrics } from "../../lib/analytics/metricsService";
 import { getUserPlatform } from "../../lib/getUserPlatform";
@@ -11,6 +14,7 @@ export default function ExecutiveDashboardPage() {
   const [metrics, setMetrics] = useState<{
     executiveAlerts: ExecutiveAlert[];
     revenue: number;
+    previousMonthRevenue: number;
     totalTrips: number;
     activeTrips: number;
     completedTrips: number;
@@ -21,6 +25,7 @@ export default function ExecutiveDashboardPage() {
   }>({
     executiveAlerts: [],
     revenue: 0,
+    previousMonthRevenue: 0,
     totalTrips: 0,
     activeTrips: 0,
     completedTrips: 0,
@@ -85,6 +90,59 @@ export default function ExecutiveDashboardPage() {
               %
             </p>
           </div>
+        </div>
+
+        <div className="mt-6">
+          <RevenueTrendCard
+            currentMonth={metrics.revenue}
+            previousMonth={metrics.previousMonthRevenue}
+          />
+        </div>
+
+        <div className="mt-6">
+
+          <ExecutiveInsights
+            insights={[
+              {
+                title: "Top Platform",
+                value: "Cape Town",
+                subtitle: "Highest completed trips",
+              },
+              {
+                title: "Top Driver",
+                value: "John Smith",
+                subtitle: "Highest acceptance rate",
+              },
+              {
+                title: "Most Used Vehicle",
+                value: "Toyota Quantum",
+                subtitle: "Most dispatched vehicle",
+              },
+              {
+                title: "Average Trip Time",
+                value: "42 min",
+                subtitle: "Current monthly average",
+              },
+            ]}
+          />
+
+        </div>
+
+        <div className="mt-6">
+
+          <OperationsOverview
+            activeTrips={metrics.activeTrips}
+            awaitingDispatch={
+              metrics.totalTrips -
+              metrics.activeTrips -
+              metrics.completedTrips
+            }
+            activeEmergencies={
+              metrics.activeEmergencies
+            }
+            overdueInvoices={0}
+          />
+
         </div>
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">

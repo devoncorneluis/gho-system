@@ -8,7 +8,7 @@ import { generateInvoicesForCycle } from "../../lib/billing/generateInvoicesForC
 type Invoice = {
   id: string;
   invoice_number: string;
-  total: number;
+  total_amount: number;
   payment_status: string;
   created_at: string;
 };
@@ -53,7 +53,7 @@ const [generating, setGenerating] =
 
     setRevenue(
       rows.reduce(
-        (sum, invoice) => sum + Number(invoice.total),
+        (sum, invoice) => sum + Number(invoice.total_amount),
         0
       )
     );
@@ -245,7 +245,7 @@ async function handleGenerateBilling() {
                     </td>
 
                     <td className="p-4">
-                      R {Number(invoice.total).toFixed(2)}
+                      R {Number(invoice.total_amount).toFixed(2)}
                     </td>
 
                     <td className="p-4">

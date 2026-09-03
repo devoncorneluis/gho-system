@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import AdminLayout from "../../components/AdminLayout";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 
 const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
 
@@ -28,7 +29,7 @@ export default function TripHistoryPage() {
       .from("trips")
       .select("*")
       .eq("platform_id", PLATFORM_ID)
-      .eq("status", "Completed")
+      .eq("status", TRIP_STATUS.COMPLETED)
       .order("created_at", { ascending: false });
 
     if (error) {

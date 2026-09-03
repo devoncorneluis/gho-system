@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 
 type Invoice = {
   id: string;
@@ -117,7 +118,7 @@ if (!profile?.platform_id) {
 const { data: trips, error: tripsError } = await supabase
   .from("trips")
   .select("*")
-  .eq("status", "Completed")
+  .eq("status", TRIP_STATUS.COMPLETED)
   .gte("trip_date", startOfMonth)
   .lte("trip_date", today);
 

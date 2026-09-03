@@ -17,6 +17,7 @@ import { summarizeRecommendationConfidence } from "./confidenceEngine";
 import { statusFromScore } from "./scoringEngine";
 import { evaluateOperationalRules } from "./rulesEngine";
 import type { EnterpriseIntelligenceSnapshot, IntelligenceRisk, IntelligenceState } from "./intelligenceTypes";
+import { TRIP_STATUS } from "../../tripStatus";
 import { buildDispatchRecommendation, rankRecommendations } from "../recommendations/recommendationEngine";
 
 export function getDefaultIntelligenceState(): IntelligenceState {
@@ -72,7 +73,7 @@ export function getDefaultIntelligenceState(): IntelligenceState {
         routeGroup: "Cape Town North",
         passengerCount: 8,
         pickupTime: "06:30",
-        status: "Assigned",
+        status: TRIP_STATUS.ASSIGNED,
         delayMinutes: 4,
         slaTargetMinutes: 15,
       },

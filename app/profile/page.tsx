@@ -4,31 +4,45 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import AdminLayout from "../../components/AdminLayout";
 
-const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
-
 type AdminProfile = {
   id: string;
+  platform_id: string | null;
   full_name: string | null;
-  phone: string | null;
-  work_place: string | null;
-  home_address: string | null;
-  vehicle_registration: string | null;
+  email: string | null;
   role: string | null;
+  active: boolean | null;
+  created_at: string | null;
 };
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<AdminProfile | null>(null);
 
   async function loadProfile() {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      alert(userError?.message || "Unable to identify the logged-in user.");
+      return;
+    }
+
     const { data, error } = await supabase
-.from("user_profiles")
-      .select("*")
-      .eq("platform_id", PLATFORM_ID)
-      .limit(1)
-      .single();
+      .from("user_profiles")
+      .select(
+        "id, platform_id, full_name, email, role, active, created_at"
+      )
+      .eq("id", user.id)
+      .maybeSingle();
 
     if (error) {
       alert(error.message);
+      return;
+    }
+
+    if (!data) {
+      alert("Your GHO profile could not be found.");
       return;
     }
 
@@ -43,26 +57,65 @@ export default function ProfilePage() {
   return (
     <AdminLayout>
       <main className="min-h-screen bg-gray-100 p-6">
-      <h1 className="text-4xl font-bold text-[#061B33]">Admin Profile</h1>
+        <h1 className="text-4xl font-bold text-[#061B33]">
+          Admin Profile
+        </h1>
 
-      <p className="text-gray-600 mt-2">
-        View your GHO admin profile details.
-      </p>
+        <p className="text-gray-600 mt-2">
+          View your GHO admin profile details.
+        </p>
 
-      <div className="bg-white rounded-xl shadow p-6 mt-6 max-w-2xl">
-        {!profile && <p>Loading profile...</p>}
+        <div className="bg-white rounded-xl shadow p-6 mt-6 max-w-2xl">
+          {!profile && <p>Loading profile...</p>}
 
-        {profile && (
-          <div className="space-y-3">
-            <p><strong>Name:</strong> {profile.full_name}</p>
-            <p><strong>Role:</strong> {profile.role}</p>
-            <p><strong>Phone:</strong> {profile.phone}</p>
-            <p><strong>Workplace:</strong> {profile.work_place}</p>
-            <p><strong>Home Address:</strong> {profile.home_address}</p>
-            <p><strong>Vehicle Registration:</strong> {profile.vehicle_registration}</p>
-          </div>
-        )}
-      </div>
+          {profile && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-500">Name</p>
+                <p className="font-semibold text-[#061B33]">
+                  {profile.full_name || "Not provided"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Email</p>
+                <p className="font-semibold text-[#061B33]">
+                  {profile.email || "Not provided"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Role</p>
+                <p className="font-semibold text-[#061B33]">
+                  {profile.role || "Not assigned"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Account Status</p>
+                <p className="font-semibold text-[#061B33]">
+                  {profile.active ? "Active" : "Inactive"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Platform ID</p>
+                <p className="font-mono text-sm text-gray-700 break-all">
+                  {profile.platform_id || "Not assigned"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Account Created</p>
+                <p className="font-semibold text-[#061B33]">
+                  {profile.created_at
+                    ? new Date(profile.created_at).toLocaleString()
+                    : "Not available"}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
     </AdminLayout>
   );

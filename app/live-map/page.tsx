@@ -56,22 +56,39 @@ export default function LiveMapPage() {
 
     loadPlatform();
   }, []);
-  // const [selectedEmergency, setSelectedEmergency] = useState<EmergencyAlertPin | null>(null);
 
   const loadLocations = useCallback(async () => {
     if (!platformId) return;
-const { data, error } = await supabase
-  .from("driver_locations")
-  .select("*")
-  .eq("platform_id", platformId)
-  .order("updated_at", { ascending: false });
+
+    const { data, error } = await supabase
+      .from("driver_locations")
+      .select(`
+        *,
+        drivers!inner(
+          platform_id,
+          full_name,
+          email
+        )
+      `)
+      .eq("drivers.platform_id", platformId)
+      .order("updated_at", { ascending: false });
 
     if (error) {
       alert(error.message);
       return;
     }
 
-    setLocations(data || []);
+    const mappedLocations: DriverLocation[] = (data || []).map((location) => ({
+      id: location.id,
+      driver_name: location.drivers?.full_name ?? null,
+      driver_email: location.drivers?.email ?? null,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      status: location.is_tracking ? "On Trip" : "Available",
+      last_updated: location.updated_at,
+    }));
+
+    setLocations(mappedLocations);
   }, [platformId]);
 
   const loadEmergencies = useCallback(async () => {

@@ -5,6 +5,7 @@ import AdminLayout from "../../components/AdminLayout";
 import DispatchSummary from "../../components/dispatch/DispatchSummary";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 
 
 
@@ -16,7 +17,7 @@ type Vehicle = { id: string; status: string | null };
 
 const menuItems = [
   { name: "Daily Planner", icon: "📅", href: "/admin-planner" },
-  { name: "Driver & Vehicle Management", icon: "🚐", href: "/drivers" },
+  { name: "Driver Fleet", icon: "🚐", href: "/driver-fleet" },
   { name: "Agents", icon: "👥", href: "/agents" },
   { name: "Trips", icon: "🚐", href: "/trips" },
   { name: "Route Playback", icon: "🛰️", href: "/route-playback" },
@@ -59,7 +60,8 @@ export default function AdminPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [passengers, setPassengers] = useState<Passenger[]>([]);
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
-
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState("");
   async function loadDashboard() {
     const userPlatform = await getUserPlatform();
 
@@ -70,17 +72,97 @@ export default function AdminPage() {
 
     const platformId = userPlatform.platformId;
 
-    const { data: tripData } = await supabase.from("trips").select("id, status").eq("platform_id", platformId);
-    const { data: driverData } = await supabase.from("drivers").select("id, availability_status").eq("platform_id", platformId);
-    const { data: vehicleData } = await supabase.from("vehicles").select("id, status").eq("platform_id", platformId);
-    const { data: passengerData } = await supabase.from("trip_passengers").select("id, pickup_status").eq("platform_id", platformId);
-    const { data: alertData } = await supabase.from("emergency_alerts").select("id, status").eq("platform_id", platformId);
+    const [
+      { data: tripData, error: tripError },
+      { data: driverData, error: driverError },
+      { data: vehicleData, error: vehicleError },
+      { data: passengerData, error: passengerError },
+      { data: alertData, error: alertError },
+    ] = await Promise.all([
+      supabase
+        .from("trips")
+        .select("id, status")
+        .eq("platform_id", platformId),
 
+      supabase
+        .from("drivers")
+        .select("id, availability_status")
+        .eq("platform_id", platformId),
+
+      supabase
+        .from("vehicles")
+        .select("id, status")
+        .eq("platform_id", platformId),
+
+      supabase
+        .from("trip_passengers")
+        .select("id, pickup_status")
+        .eq("platform_id", platformId),
+
+      supabase
+        .from("emergency_alerts")
+        .select("id, status")
+        .eq("platform_id", platformId),
+    ]);
+
+if (
+  tripError ||
+  driverError ||
+  vehicleError ||
+  passengerError ||
+  alertError
+) {
+  console.error("Dashboard failed to load", {
+    tripError,
+    driverError,
+    vehicleError,
+    passengerError,
+    alertError,
+  });
+
+  setError(
+    "Unable to load the latest dashboard information."
+  );
+
+  setLoading(false);
+  return;
+}
+if (error) {
+  return (
+    <AdminLayout>
+      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="max-w-md rounded-3xl bg-white p-8 shadow text-center">
+
+          <div className="text-5xl mb-4">
+            ⚠️
+          </div>
+
+          <h2 className="text-2xl font-black text-[#061B33]">
+            Dashboard Unavailable
+          </h2>
+
+          <p className="mt-3 text-gray-500">
+            {error}
+          </p>
+
+          <button
+            onClick={loadDashboard}
+            className="mt-6 rounded-xl bg-[#061B33] px-6 py-3 text-white hover:bg-[#0A2A4F]"
+          >
+            Retry
+          </button>
+
+        </div>
+      </main>
+    </AdminLayout>
+  );
+}
     setTrips(tripData || []);
     setDrivers(driverData || []);
     setVehicles(vehicleData || []);
     setPassengers(passengerData || []);
     setAlerts(alertData || []);
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -90,8 +172,15 @@ export default function AdminPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const activeTrips = trips.filter((t) => t.status === "Assigned" || t.status === "In Progress").length;
-  const completedTrips = trips.filter((t) => t.status === "Completed").length;
+  const activeTrips = trips.filter(
+    (t) =>
+      t.status === TRIP_STATUS.ASSIGNED ||
+      t.status === TRIP_STATUS.IN_TRANSIT
+  ).length;
+
+  const completedTrips = trips.filter(
+    (t) => t.status === TRIP_STATUS.COMPLETED
+  ).length;
   const availableDrivers = drivers.filter((d) => d.availability_status === "Available").length;
   const onTripDrivers = drivers.filter((d) => d.availability_status === "On Trip").length;
   const availableVehicles = vehicles.filter((v) => v.status === "Available").length;
@@ -101,7 +190,25 @@ export default function AdminPage() {
   const latePassengers = passengers.filter((p) => p.pickup_status === "Running Late").length;
   const noShowPassengers = passengers.filter((p) => p.pickup_status === "No Show").length;
   const openEmergencies = alerts.filter((a) => a.status === "Open").length;
+if (loading) {
+  return (
+    <AdminLayout>
+      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-5xl mb-4">🚐</div>
 
+          <h2 className="text-2xl font-black text-[#061B33]">
+            Loading Dashboard...
+          </h2>
+
+          <p className="mt-2 text-gray-500">
+            Fetching live transport operations.
+          </p>
+        </div>
+      </main>
+    </AdminLayout>
+  );
+}
   return (
     <AdminLayout>
       <main className="min-h-screen bg-[#F3F6FA] p-6">
@@ -129,18 +236,14 @@ export default function AdminPage() {
           </div>
         </section>
 
-        <section className="mt-6">
-          <DispatchSummary trips={28} passengers={247} drivers={19} vehicles={19} />
-        </section>
-
-        <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
-          <StatCard title="Total Trips" value={trips.length} icon="🚐" tone="orange" />
-          <StatCard title="Active Trips" value={activeTrips} icon="🟠" tone="orange" />
-          <StatCard title="Completed" value={completedTrips} icon="✅" tone="green" />
-          <StatCard title="Drivers Ready" value={availableDrivers} icon="👤" tone="blue" />
-          <StatCard title="Vehicles Ready" value={availableVehicles} icon="🚙" tone="dark" />
-          <StatCard title="Emergencies" value={openEmergencies} icon="🚨" tone="red" />
-        </section>
+<section className="mt-6">
+  <DispatchSummary
+    trips={trips.length}
+    passengers={passengers.length}
+    drivers={drivers.length}
+    vehicles={vehicles.length}
+  />
+</section>
 
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">

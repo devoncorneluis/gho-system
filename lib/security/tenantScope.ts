@@ -2,7 +2,7 @@ export type EqChain = {
   eq: (column: string, value: string) => EqChain;
 };
 
-export function assertPlatformScope(platformId?: string): string {
+export function assertPlatformScope(platformId?: string | null): string {
   const value = platformId?.trim();
   if (!value) {
     throw new Error("platformId is required for tenant-scoped trip mutation.");

@@ -1,3 +1,5 @@
+import { TRIP_STATUS } from "../tripStatus";
+
 export type TripMetric = {
   status: string;
   passengerCount?: number;
@@ -6,7 +8,7 @@ export type TripMetric = {
 
 export function calculateTripSuccessRate(trips: TripMetric[]): number {
   if (!trips.length) return 0;
-  const completedTrips = trips.filter((trip) => trip.status === "Completed").length;
+  const completedTrips = trips.filter((trip) => trip.status === TRIP_STATUS.COMPLETED).length;
   return Math.round((completedTrips / trips.length) * 100);
 }
 

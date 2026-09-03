@@ -5,12 +5,11 @@ import { supabase } from "../lib/supabase";
 
 const links = [
   { name: "🏠 Dashboard", href: "/admin" },
-  { name: "🚐 Daily Planner", href: "/admin-planner" },
+{ name: "📋 Plan Trips", href: "/admin-planner" },
   { name: "🚦 Dispatch", href: "/dispatch-command" },
-  { name: "🚐 Trips", href: "/trips" },
+{ name: "📋 Booked Trips", href: "/trips" },
   { name: "👥 Agents", href: "/agents" },
-  { name: "🚗 Drivers", href: "/drivers" },
-  { name: "🚙 Vehicles", href: "/vehicles" },
+  { name: "🚙 Driver Fleet", href: "/driver-fleet" },
   { name: "📍 Live Map", href: "/live-map" },
   { name: "🚨 Emergency", href: "/emergency-dashboard" },
   { name: "🔔 Notifications", href: "/notifications" },

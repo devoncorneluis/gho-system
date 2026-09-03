@@ -7,13 +7,15 @@ import { getUserPlatform } from "../../../lib/getUserPlatform";
 
 type DriverLocation = {
   id: string;
+  driver_id: string;
+  trip_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  updated_at: string | null;
+  is_tracking: boolean;
   driver_name: string | null;
   vehicle_name: string | null;
   trip_code: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  last_update: string | null;
-  status: string | null;
 };
 
 export default function ClientLiveTrackingPage() {
@@ -26,22 +28,49 @@ export default function ClientLiveTrackingPage() {
 
       if (!userPlatform) return;
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("driver_locations")
         .select(`
           id,
-          driver_name,
-          vehicle_name,
-          trip_code,
+          driver_id,
+          trip_id,
           latitude,
           longitude,
-          last_update,
-          status
+          updated_at,
+          is_tracking,
+          drivers!inner(
+            platform_id,
+            full_name
+          ),
+          trips(
+            trip_code,
+            vehicle_name
+          )
         `)
-        .eq("platform_id", userPlatform.platformId)
-        .order("last_update", { ascending: false });
+        .eq("drivers.platform_id", userPlatform.platformId)
+        .order("updated_at", { ascending: false });
 
-      setDrivers(data ?? []);
+      if (error) {
+        console.error("Unable to load live tracking:", error);
+        setDrivers([]);
+        setLoading(false);
+        return;
+      }
+
+      const mappedDrivers: DriverLocation[] = (data ?? []).map((location) => ({
+        id: location.id,
+        driver_id: location.driver_id,
+        trip_id: location.trip_id,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        updated_at: location.updated_at,
+        is_tracking: location.is_tracking,
+        driver_name: location.drivers?.[0]?.full_name ?? null,
+        vehicle_name: location.trips?.[0]?.vehicle_name ?? null,
+        trip_code: location.trips?.[0]?.trip_code ?? null,
+      }));
+
+      setDrivers(mappedDrivers);
       setLoading(false);
     }
 
@@ -123,12 +152,12 @@ export default function ClientLiveTrackingPage() {
                     </td>
 
                     <td className="p-4">
-                      {driver.status ?? "-"}
+                      {driver.is_tracking ? "Tracking" : "Offline"}
                     </td>
 
                     <td className="p-4">
-                      {driver.last_update
-                        ? new Date(driver.last_update).toLocaleString()
+                      {driver.updated_at
+                        ? new Date(driver.updated_at).toLocaleString()
                         : "-"}
                     </td>
 

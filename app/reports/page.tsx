@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 import AdminLayout from "../../components/AdminLayout";
 
 const PLATFORM_ID = "713c411b-847e-4379-8e38-c142e06ff5fd";
@@ -52,8 +53,12 @@ export default function ReportsPage() {
   }, []);
 
   const totalTrips = trips.length;
-  const assignedTrips = trips.filter((trip) => trip.status === "Assigned").length;
-  const completedTrips = trips.filter((trip) => trip.status === "Completed").length;
+  const assignedTrips = trips.filter(
+    (trip) => trip.status === TRIP_STATUS.ASSIGNED
+  ).length;
+  const completedTrips = trips.filter(
+    (trip) => trip.status === TRIP_STATUS.COMPLETED
+  ).length;
   const suggestedTrips = trips.filter((trip) => trip.status === "Suggested").length;
 
   const waitingPassengers = passengers.filter((p) => !p.pickup_status || p.pickup_status === "Waiting").length;

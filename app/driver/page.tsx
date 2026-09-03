@@ -1,19 +1,26 @@
 "use client";
-import { startTrip } from "../../lib/driver/startTrip";
-import { completeTrip } from "../../lib/driver/completeTrip";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import {
   updateTripStatus as dispatchUpdateTripStatus,
   arriveAtPickup,
+  startTrip as dispatchStartTrip,
+  completeTrip as dispatchCompleteTrip,
 } from "../../lib/dispatchService";
-import { TRIP_STATUS } from "../../lib/tripStatus";
+import {
+  TRIP_STATUS,
+  getStatusLabel,
+} from "../../lib/tripStatus";
 import { respondToTrip } from "../../lib/driver/respondToTrip";
 
 type Trip = {
   id: string;
+  platform_id: string | null;
+  driver_id: string | null;
+  vehicle_id: string | null;
   trip_code: string;
+  platform_name?: string | null;
   trip_date: string | null;
   shift?: string | null;
   area: string | null;
@@ -151,13 +158,18 @@ const incidentTypes = [
   async function loadTrips(activePlatformId: string, driverName: string) {
     const { data, error } = await supabase
       .from("trips")
-      .select("*")
+      .select(`
+        *,
+        platforms (
+          name
+        )
+      `)
       .eq("platform_id", activePlatformId)
       .eq("driver_name", driverName)
       .in("status", [
-        "Assigned",
-        "Accepted",
-        "In Progress",
+        TRIP_STATUS.ASSIGNED,
+        TRIP_STATUS.ACCEPTED,
+        TRIP_STATUS.IN_TRANSIT,
         "dispatched",
         "started",
       ])
@@ -168,7 +180,12 @@ const incidentTypes = [
       return;
     }
 
-    setTrips(data || []);
+    const tripsWithPlatform = (data || []).map((trip) => ({
+      ...trip,
+      platform_name: trip.platforms?.name ?? null,
+    }));
+
+    setTrips(tripsWithPlatform);
   }
   async function loadPassengers(activePlatformId: string) {
     const { data, error } = await supabase
@@ -192,41 +209,50 @@ async function saveDriverLocation(
   accuracy: number | null,
   tripId: string | null
 ) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    if (!platformId || !user?.email || !driver?.full_name) {
-      alert("Driver profile not loaded yet.");
-      return;
-    }
+  if (!platformId || !user?.email || !driver?.full_name) {
+    alert("Driver profile not loaded yet.");
+    return;
+  }
 
-const { data: existing } = await supabase
+const { data: existing, error: lookupError } = await supabase
   .from("driver_locations")
   .select("id")
-  .eq("platform_id", platformId)
   .eq("driver_id", driver.id)
   .limit(1)
   .maybeSingle();
 
-    if (existing?.id) {
-await supabase
-  .from("driver_locations")
-  .update({
-    platform_id: platformId,
-    trip_id: tripId,
-    latitude,
-    longitude,
-    speed,
-    heading,
-    accuracy,
-    is_tracking: true,
-    updated_at: new Date().toISOString(),
-  })
-  .eq("id", existing.id);
-    } else {
-await supabase.from("driver_locations").insert({
-  platform_id: platformId,
+  if (lookupError) {
+    console.error("Unable to find driver location:", lookupError);
+    return;
+  }
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from("driver_locations")
+.update({
+  trip_id: tripId,
+  latitude,
+  longitude,
+  speed,
+  heading,
+  accuracy,
+  is_tracking: true,
+  updated_at: new Date().toISOString(),
+})
+      .eq("id", existing.id);
+
+    if (error) {
+      console.error("Unable to update driver location:", error);
+      return;
+    }
+  } else {
+    const { error } = await supabase
+      .from("driver_locations")
+.insert({
   driver_id: driver.id,
   trip_id: tripId,
   latitude,
@@ -236,22 +262,36 @@ await supabase.from("driver_locations").insert({
   accuracy,
   is_tracking: true,
   updated_at: new Date().toISOString(),
-});
-    }
+})
 
-await supabase.from("driver_location_history").insert({
-  platform_id: platformId,
-  driver_id: driver.id,
-  trip_id: tripId,
-  latitude,
-  longitude,
-  speed,
-  heading,
-  recorded_at: new Date().toISOString(),
-});
+    if (error) {
+      console.error("Unable to save driver location:", error);
+      return;
+    }
   }
 
-  function startGpsTracking() {
+  const { error: historyError } = await supabase
+    .from("driver_location_history")
+    .insert({
+      platform_id: platformId,
+      driver_id: driver.id,
+      trip_id: tripId,
+      latitude,
+      longitude,
+      speed,
+      heading,
+      recorded_at: new Date().toISOString(),
+    });
+
+  if (historyError) {
+    console.error(
+      "Unable to save driver location history:",
+      historyError
+    );
+  }
+}
+
+  function startGpsTracking(trip: Trip) {
     if (!navigator.geolocation) {
       alert("Location is not supported on this device.");
       return;
@@ -269,7 +309,7 @@ async (position) => {
     position.coords.speed,
     position.coords.heading,
     position.coords.accuracy,
-    selectedTripId
+    trip.id
   );
 
   setTracking(true);
@@ -296,13 +336,13 @@ async function stopGpsTracking() {
 
   if (driver?.id) {
     const { error } = await supabase
-      .from("driver_locations")
-      .update({
-        is_tracking: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("platform_id", platformId)
-      .eq("driver_id", driver.id);
+.from("driver_locations")
+.update({
+  is_tracking: false,
+  trip_id: null,
+  updated_at: new Date().toISOString(),
+})
+.eq("driver_id", driver.id);
 
     if (error) {
       console.error(error);
@@ -540,39 +580,62 @@ longitude: currentLongitude,
   const driverName = driver?.full_name || "Driver";
 
   async function handleStartTrip(trip: Trip) {
+    if (!trip.platform_id || !trip.driver_id || !trip.vehicle_id) {
+      alert("Trip driver, vehicle, or platform information is missing.");
+      return;
+    }
+
     try {
-      await startTrip({
-        platformId,
-        tripId: trip.id,
-        tripCode: trip.trip_code ?? "Unknown Trip",
-        driverName,
-      });
+      await dispatchStartTrip(
+        supabase,
+        trip.id,
+        trip.platform_id,
+        trip.driver_id,
+        trip.vehicle_id
+      );
 
       await loadTrips(platformId, driverName);
     } catch (error) {
       console.error(error);
-      alert("Unable to start trip.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to start trip."
+      );
     }
   }
 
   async function handleCompleteTrip(trip: Trip) {
-    try {
-      await completeTrip({
-        platformId,
-        tripId: trip.id,
-        tripCode: trip.trip_code ?? "Unknown Trip",
-        driverName,
-      });
+    if (!trip.platform_id || !trip.driver_id || !trip.vehicle_id) {
+      alert("Trip driver, vehicle, or platform information is missing.");
+      return;
+    }
 
+    try {
+      await dispatchCompleteTrip(
+        supabase,
+        trip.id,
+        trip.platform_id,
+        trip.driver_id,
+        trip.vehicle_id
+      );
+
+      await stopGpsTracking();
       await loadTrips(platformId, driverName);
     } catch (error) {
       console.error(error);
-      alert("Unable to complete trip.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to complete trip."
+      );
     }
   }
 
   const activeTrips = trips.filter(
-    (trip) => trip.status !== "Completed" && trip.status !== "Cancelled"
+    (trip) =>
+      trip.status !== TRIP_STATUS.COMPLETED &&
+      trip.status !== TRIP_STATUS.CANCELLED
   );
 
   const selectedTrip = activeTrips.find((trip) => trip.id === selectedTripId);
@@ -609,8 +672,8 @@ longitude: currentLongitude,
 
           <div className="grid grid-cols-2 gap-3 mt-4">
             <button
-              onClick={startGpsTracking}
-              disabled={tracking}
+              onClick={() => selectedTrip && startGpsTracking(selectedTrip)}
+              disabled={tracking || !selectedTrip}
               className="bg-green-600 text-white p-3 rounded-2xl font-bold disabled:bg-gray-300"
             >
               Start GPS
@@ -653,10 +716,16 @@ longitude: currentLongitude,
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-xl font-black text-[#061B33]">
-                          {trip.trip_code}
+                          {trip.trip_date || "No date"}
+                        </p>
+                        <p className="text-lg font-bold text-gray-700 mt-1">
+                          {trip.pickup_time || "No pickup time"}
+                          {trip.dropoff_time
+                            ? ` → ${trip.dropoff_time}`
+                            : ""}
                         </p>
                         <p className="text-gray-500 mt-1">
-                          {trip.area || "Route not set"}
+                          {trip.platform_name || "Company not set"}
                         </p>
                       </div>
 
@@ -666,67 +735,94 @@ longitude: currentLongitude,
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 mt-5 text-sm text-gray-700">
-                      <p>📅 {trip.trip_date || "No date"}</p>
-                      <p>👥 {trip.passenger_count || tripPassengers.length} Passengers Assigned</p>
-                      <p>📏 {trip.estimated_km ? `${trip.estimated_km} km` : "KM not set"}</p>
-                      <p>🚐 Vehicle: {trip.vehicle_name || "Vehicle not assigned"}</p>
-                      <p className="col-span-2">🔢 Registration: {trip.vehicle_registration || "No registration"}</p>
+                      <p>
+                        👥 {trip.passenger_count || tripPassengers.length} Passengers
+                      </p>
+
+                      <p>
+                        📏 {trip.estimated_km ? `${trip.estimated_km} km` : "KM not set"}
+                      </p>
+
+                      <p>
+                        🚐 {trip.vehicle_name || "Vehicle not assigned"}
+                      </p>
+
+                      <p>
+                        🔢 {trip.vehicle_registration || "No registration"}
+                      </p>
+
+                      <p className="col-span-2">
+                        📍 {trip.area || "Pickup areas will appear when trip is opened"}
+                      </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 mt-5">
-                      <div className="flex gap-2">
-                        {trip.status === "Accepted" && (
-                          <button
-                            onClick={() => handleStartTrip(trip)}
-                            className="mt-4 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white"
-                          >
-                            Start Trip
-                          </button>
-                        )}
-
-                        {trip.status === "In Progress" && (
-                          <button
-                            onClick={() => handleCompleteTrip(trip)}
-                            className="mt-4 rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white"
-                          >
-                            Complete Trip
-                          </button>
-                        )}
-
-                        {trip.driver_response === "Pending" && (
-                          <div className="mt-4 flex gap-3">
-                            <button
-                              onClick={() => acceptTrip(trip)}
-                              className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white"
-                            >
-                              Accept Trip
-                            </button>
-
-                            <button
-                              onClick={() => rejectTrip(trip)}
-                              className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white"
-                            >
-                              Reject Trip
-                            </button>
-                          </div>
-                        )}
-                      </div>
-{trip.status === TRIP_STATUS.EN_ROUTE && (
-  <button
-    onClick={() => handleArriveAtPickup(trip)}
-    className="bg-orange-600 text-white rounded-xl px-3 py-3 font-bold"
-  >
-    Arrived at Pickup
-  </button>
-)}
+                    <div className="grid grid-cols-1 gap-3 mt-5">
                       <button
-                        onClick={() =>
-                          openGoogleMaps(firstPassenger?.pickup_address || trip.area)
-                        }
-                        className="bg-[#061B33] text-white rounded-xl px-3 py-3 font-bold"
+                        onClick={() => setSelectedTripId(trip.id)}
+                        className="w-full rounded-xl bg-[#061B33] px-4 py-3 font-bold text-white hover:bg-[#0B3A82]"
                       >
-                        Google Maps
+                        Open Trip
                       </button>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex gap-2">
+                          {trip.status === TRIP_STATUS.ACCEPTED && (
+                            <button
+                              onClick={() => handleStartTrip(trip)}
+                              className="mt-4 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white"
+                            >
+                              Start Trip
+                            </button>
+                          )}
+
+                          {trip.status === TRIP_STATUS.IN_TRANSIT && (
+                            <button
+                              onClick={() => handleCompleteTrip(trip)}
+                              className="mt-4 rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white"
+                            >
+                              Complete Trip
+                            </button>
+                          )}
+
+                          {trip.driver_response === "Pending" && (
+                            <div className="mt-4 flex gap-3">
+                              <button
+                                onClick={() => acceptTrip(trip)}
+                                className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white"
+                              >
+                                Accept Trip
+                              </button>
+
+                              <button
+                                onClick={() => rejectTrip(trip)}
+                                className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white"
+                              >
+                                Reject Trip
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {trip.status === TRIP_STATUS.EN_ROUTE && (
+                          <button
+                            onClick={() => handleArriveAtPickup(trip)}
+                            className="bg-orange-600 text-white rounded-xl px-3 py-3 font-bold"
+                          >
+                            Arrived at Pickup
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() =>
+                            openGoogleMaps(
+                              firstPassenger?.pickup_address || trip.area
+                            )
+                          }
+                          className="bg-[#061B33] text-white rounded-xl px-3 py-3 font-bold"
+                        >
+                          Google Maps
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -738,7 +834,12 @@ longitude: currentLongitude,
         {selectedTrip && (
           <>
             <button
-              onClick={() => setSelectedTripId(null)}
+              onClick={async () => {
+                if (tracking) {
+                  await stopGpsTracking();
+                }
+                setSelectedTripId(null);
+              }}
               className="border rounded-xl px-4 py-2 font-bold bg-white"
             >
               ← Back to trips
@@ -885,32 +986,52 @@ onClick={() => reportIncident(incident)}
                     </p>
 
                     <div className="flex flex-wrap gap-2 mt-4">
-                      <button
-                        onClick={() =>
-                          updatePassengerStatus(passenger.id, "Picked Up")
-                        }
-                        className="bg-green-600 text-white px-3 py-2 rounded-lg font-bold"
-                      >
-                        Picked Up
-                      </button>
+                      {passenger.pickup_status === "Picked Up" ? (
+                        <button
+                          disabled
+                          className="bg-gray-300 text-gray-600 px-3 py-2 rounded-lg font-bold cursor-not-allowed"
+                        >
+                          ✅ Passenger Collected
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() =>
+                              updatePassengerStatus(
+                                passenger.id,
+                                "Picked Up"
+                              )
+                            }
+                            className="bg-green-600 text-white px-3 py-2 rounded-lg font-bold"
+                          >
+                            Picked Up
+                          </button>
 
-                      <button
-                        onClick={() =>
-                          updatePassengerStatus(passenger.id, "Running Late")
-                        }
-                        className="bg-orange-500 text-white px-3 py-2 rounded-lg font-bold"
-                      >
-                        Late
-                      </button>
+                          <button
+                            onClick={() =>
+                              updatePassengerStatus(
+                                passenger.id,
+                                "Running Late"
+                              )
+                            }
+                            className="bg-orange-500 text-white px-3 py-2 rounded-lg font-bold"
+                          >
+                            Late
+                          </button>
 
-                      <button
-                        onClick={() =>
-                          updatePassengerStatus(passenger.id, "No Show")
-                        }
-                        className="bg-red-600 text-white px-3 py-2 rounded-lg font-bold"
-                      >
-                        No Show
-                      </button>
+                          <button
+                            onClick={() =>
+                              updatePassengerStatus(
+                                passenger.id,
+                                "No Show"
+                              )
+                            }
+                            className="bg-red-600 text-white px-3 py-2 rounded-lg font-bold"
+                          >
+                            No Show
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -920,7 +1041,9 @@ onClick={() => reportIncident(incident)}
 
 onClick={() => {
   const waitingPassengers = selectedPassengers.filter(
-    (p) => p.pickup_status !== "Picked Up"
+    (p) =>
+      p.pickup_status !== "Picked Up" &&
+      p.pickup_status !== "No Show"
   );
 
   if (waitingPassengers.length > 0) {

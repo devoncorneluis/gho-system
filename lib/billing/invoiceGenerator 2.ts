@@ -5,9 +5,9 @@ import {
 } from "./billingCalculator";
 
 import { generateInvoiceNumber } from "./invoiceNumber";
-import { getBillingCycle } from "./billingCycle";
 
 export type InvoiceTrip = BillingTrip & {
+  tripId: string;
   tripCode: string;
 };
 
@@ -15,7 +15,9 @@ export type Invoice = {
   invoiceNumber: string;
   billingCycle: string;
   generatedAt: Date;
+
   trips: InvoiceTrip[];
+
   subtotal: number;
   vat: number;
   total: number;
@@ -23,9 +25,11 @@ export type Invoice = {
 
 export function generateInvoice(
   trips: InvoiceTrip[],
-  settings: BillingSettings
+  settings: BillingSettings,
+  billingCycle: string
 ): Invoice {
   let subtotal = 0;
+  let vat = 0;
 
   for (const trip of trips) {
     const result = calculateTripCharge(
@@ -33,16 +37,26 @@ export function generateInvoice(
       settings
     );
 
-    subtotal += result.total;
+    subtotal += result.subtotal;
+    vat += result.vat;
   }
 
   return {
-    invoiceNumber: generateInvoiceNumber(),
-    billingCycle: getBillingCycle(new Date()).cycle,
-    generatedAt: new Date(),
+    invoiceNumber:
+      generateInvoiceNumber(),
+
+    billingCycle,
+
+    generatedAt:
+      new Date(),
+
     trips,
+
     subtotal,
-    vat: 0,
-    total: subtotal,
+
+    vat,
+
+    total:
+      subtotal + vat,
   };
 }

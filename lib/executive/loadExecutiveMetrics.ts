@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { TRIP_STATUS } from "../tripStatus";
 
 export type ExecutiveMetrics = {
   revenue: number;
@@ -29,9 +30,9 @@ export async function loadExecutiveMetrics(): Promise<ExecutiveMetrics> {
     supabase.from("trips")
       .select("id,status")
       .in("status", [
-        "Assigned",
-        "Accepted",
-        "Started",
+        TRIP_STATUS.ASSIGNED,
+        TRIP_STATUS.ACCEPTED,
+        TRIP_STATUS.IN_TRANSIT,
       ]),
 
     supabase.from("platforms")

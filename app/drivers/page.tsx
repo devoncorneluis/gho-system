@@ -228,20 +228,39 @@ if (error) {
 }
 
   try {
-    await fetch("/api/create-driver-user", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        password: "Temp1234!",
-        full_name: name,
-        platform_id: platformId,
-      }),
-    });
+const response = await fetch("/api/create-driver-user", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    email,
+    full_name: name,
+    platform_id: platformId,
+  }),
+});
+
+const result = await response.json();
+
+if (!response.ok) {
+  alert(result.error || "Driver account could not be created.");
+  return;
+}
+
+alert(
+  result.message ||
+    `Driver account invitation sent to ${email}.`
+);
   } catch (err) {
     console.error("Driver login creation failed", err);
+
+    alert(
+      err instanceof Error
+        ? err.message
+        : "Driver was created, but the login invitation could not be sent."
+    );
+
+    return;
   }
 
 setName("");
@@ -672,7 +691,8 @@ Save Driver & Vehicle
     try {
       const trip = await getCurrentTripForDriver(
         supabase,
-        driver.id
+        driver.id,
+        platformId
       );
 
       if (!trip) {
@@ -708,7 +728,8 @@ Save Driver & Vehicle
       try {
         const trip = await getCurrentTripForDriver(
           supabase,
-          driver.id
+          driver.id,
+          platformId
         );
 
         if (!trip) {
@@ -736,7 +757,6 @@ async (position) => {
   const { error: locationError } = await supabase
     .from("driver_locations")
     .upsert({
-      platform_id: platformId,
       driver_id: driver.id,
       trip_id: trip.id,
       latitude,
@@ -802,7 +822,8 @@ async (position) => {
     try {
       const trip = await getCurrentTripForDriver(
         supabase,
-        driver.id
+        driver.id,
+        platformId
       );
 
       if (!trip) {
@@ -838,7 +859,8 @@ async (position) => {
     try {
       const trip = await getCurrentTripForDriver(
         supabase,
-        driver.id
+        driver.id,
+        platformId
       );
 
       if (!trip) {

@@ -2,6 +2,7 @@ import { buildClientMetrics } from "./clientAnalytics";
 import { buildOperationsMetrics } from "./operationsAnalytics";
 import { getUserPlatform } from "../getUserPlatform";
 import { supabase } from "../supabase";
+import { TRIP_STATUS } from "../tripStatus";
 
 type TripRow = {
   id: string;
@@ -31,6 +32,7 @@ interface ExecutiveMetrics {
     severity: "high" | "medium" | "low";
   }[];
   revenue: number;
+  previousMonthRevenue: number;
   totalTrips: number;
   activeTrips: number;
   completedTrips: number;
@@ -55,9 +57,9 @@ export async function getOperationsMetrics(platformId: string) {
 
   return buildOperationsMetrics({
     totalTrips: tripList.length,
-    activeTrips: tripList.filter((trip: TripRow) => trip.status === "In Progress").length,
-    assignedTrips: tripList.filter((trip: TripRow) => trip.status === "Assigned").length,
-    completedTrips: tripList.filter((trip: TripRow) => trip.status === "Completed").length,
+    activeTrips: tripList.filter((trip: TripRow) => trip.status === TRIP_STATUS.IN_TRANSIT).length,
+    assignedTrips: tripList.filter((trip: TripRow) => trip.status === TRIP_STATUS.ASSIGNED).length,
+    completedTrips: tripList.filter((trip: TripRow) => trip.status === TRIP_STATUS.COMPLETED).length,
     pendingDriverResponses: tripList.filter((trip: TripRow) => !trip.driver_response || trip.driver_response === "pending").length,
     acceptedDriverResponses: tripList.filter((trip: TripRow) => trip.driver_response === "accepted").length,
     rejectedDriverResponses: tripList.filter((trip: TripRow) => trip.driver_response === "rejected").length,
@@ -69,6 +71,11 @@ export async function getOperationsMetrics(platformId: string) {
 }
 
 export async function getExecutiveMetrics(platformId: string): Promise<ExecutiveMetrics> {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
   const [trips, vehicles, emergencyRecords] = await Promise.all([
     supabase.from("trips").select("id, status, driver_response").eq("platform_id", platformId),
     supabase.from("vehicles").select("id, status").eq("platform_id", platformId),
@@ -77,7 +84,7 @@ export async function getExecutiveMetrics(platformId: string): Promise<Executive
 
   const { data: payments } = await supabase
     .from("payments")
-    .select("amount")
+    .select("amount, created_at")
     .eq("platform_id", platformId);
 
   const { data: overdueInvoices } = await supabase
@@ -96,22 +103,35 @@ export async function getExecutiveMetrics(platformId: string): Promise<Executive
     .from("trips")
     .select("id")
     .eq("platform_id", platformId)
-    .in("status", ["Scheduled", "Planned"]);
+    .in("status", [TRIP_STATUS.PLANNED]);
 
   const tripList = trips.data || [];
   const vehicleList = vehicles.data || [];
   const emergencyList = emergencyRecords.data || [];
 
-  const revenue =
-    (payments ?? []).reduce(
-      (sum, payment) =>
-        sum + Number(payment.amount ?? 0),
-      0
-    );
+  const paymentList = payments ?? [];
+
+  const revenue = paymentList.reduce((sum, payment) => {
+    const createdAt = payment.created_at ? new Date(payment.created_at) : null;
+    if (!createdAt) return sum;
+    if (createdAt >= monthStart && createdAt < nextMonthStart) {
+      return sum + Number(payment.amount ?? 0);
+    }
+    return sum;
+  }, 0);
+
+  const previousMonthRevenue = paymentList.reduce((sum, payment) => {
+    const createdAt = payment.created_at ? new Date(payment.created_at) : null;
+    if (!createdAt) return sum;
+    if (createdAt >= previousMonthStart && createdAt < monthStart) {
+      return sum + Number(payment.amount ?? 0);
+    }
+    return sum;
+  }, 0);
 
   const totalTrips = tripList.length;
-  const activeTrips = tripList.filter((trip: TripRow) => trip.status === "In Progress").length;
-  const completedTrips = tripList.filter((trip: TripRow) => trip.status === "Completed").length;
+  const activeTrips = tripList.filter((trip: TripRow) => trip.status === TRIP_STATUS.IN_TRANSIT).length;
+  const completedTrips = tripList.filter((trip: TripRow) => trip.status === TRIP_STATUS.COMPLETED).length;
   const fleetUtilisation = vehicleList.length > 0 ? Math.round((vehicleList.filter((vehicle: VehicleRow) => vehicle.status === "Available").length / vehicleList.length) * 100) : 0;
   const acceptedResponses = tripList.filter((trip: TripRow) => trip.driver_response === "accepted").length;
   const totalResponses = tripList.filter((trip: TripRow) => Boolean(trip.driver_response)).length;
@@ -151,6 +171,7 @@ export async function getExecutiveMetrics(platformId: string): Promise<Executive
   return {
     executiveAlerts,
     revenue,
+    previousMonthRevenue,
     totalTrips,
     activeTrips,
     completedTrips,
@@ -174,8 +195,8 @@ export async function getClientMetrics(platformId: string) {
 
   return buildClientMetrics({
     totalTrips: tripList.length,
-    activeTrips: tripList.filter((trip: TripRow) => trip.status === "In Progress").length,
-    completedTrips: tripList.filter((trip: TripRow) => trip.status === "Completed").length,
+    activeTrips: tripList.filter((trip: TripRow) => trip.status === TRIP_STATUS.IN_TRANSIT).length,
+    completedTrips: tripList.filter((trip: TripRow) => trip.status === TRIP_STATUS.COMPLETED).length,
     liveVehicles: vehicleList.filter((vehicle: VehicleRow) => vehicle.status === "Available").length,
     activeDrivers: driverList.filter((driver: DriverRow) => driver.availability_status === "On Trip").length,
     etaCoverage: tripList.length > 0 ? 100 : 0,

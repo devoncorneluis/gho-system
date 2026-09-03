@@ -8,6 +8,7 @@ import TripCard from "../../components/trips/TripCard";
 import StatusBadge from "../../components/trips/StatusBadge";
 import { dispatchTrip } from "../../lib/dispatchService";
 import Pagination from "../../components/common/Pagination";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 
 
 type TripPassenger = {
@@ -42,7 +43,7 @@ type Trip = {
   created_at: string | null;
   vehicle_name: string | null;
   vehicle_registration: string | null;
-  estimated_km: number | null;
+distance_km: number | null;
 };
 
 const PAGE_SIZE = 25;
@@ -111,17 +112,17 @@ export default function TripsPage() {
         .from("trips")
         .select("id", { count: "exact", head: true })
         .eq("platform_id", platformId)
-        .eq("status", "Confirmed"),
+        .eq("status", TRIP_STATUS.APPROVED),
       supabase
         .from("trips")
         .select("id", { count: "exact", head: true })
         .eq("platform_id", platformId)
-        .eq("status", "In Progress"),
+        .eq("status", TRIP_STATUS.IN_TRANSIT),
       supabase
         .from("trips")
         .select("id", { count: "exact", head: true })
         .eq("platform_id", platformId)
-        .eq("status", "Completed"),
+        .eq("status", TRIP_STATUS.COMPLETED),
     ]);
 
     const { data, error, count } = tripsResult;
@@ -174,7 +175,7 @@ export default function TripsPage() {
         updated_at,
         drivers(full_name)
       `)
-      .eq("platform_id", platformId)
+      .eq("drivers.platform_id", platformId)
       .eq("is_tracking", true);
 
     if (error) {
@@ -216,8 +217,7 @@ export default function TripsPage() {
       await createAssignmentNotifications(trip);
     }
 
-    if ((status || trip.status) === "Completed") {
-      await saveBillingReport(trip);
+    if ((status || trip.status) === TRIP_STATUS.COMPLETED) {
     }
 
     loadTrips();
@@ -297,30 +297,6 @@ export default function TripsPage() {
     }
   }
 
-  async function saveBillingReport(trip: Trip) {
-    if (!platformId) return;
-
-    await supabase.from("trip_billing_reports").insert({
-      platform_id: platformId,
-      trip_id: trip.id,
-      trip_code: trip.trip_code,
-      trip_date: trip.trip_date,
-      company_name: "GHO",
-      client_name: trip.area,
-      area: trip.area,
-      pickup_time: trip.pickup_time,
-      dropoff_time: trip.dropoff_time,
-      driver_name: trip.driver_name,
-      vehicle_name: trip.vehicle_name,
-      vehicle_registration: trip.vehicle_registration,
-      passenger_count: trip.passenger_count,
-      estimated_km: trip.estimated_km,
-      trip_status: "Completed",
-      billing_status: "Unbilled",
-      billing_amount: 0,
-      notes: "Auto-saved when trip was completed.",
-    });
-  }
 
   useEffect(() => {
     async function setupPage() {
@@ -363,13 +339,13 @@ export default function TripsPage() {
   return (
     <AdminLayout>
       <main className="min-h-screen bg-gray-100 p-6">
-        <h1 className="text-4xl font-bold text-[#061B33]">
-          Trips Management
-        </h1>
+<h1 className="text-4xl font-bold text-[#061B33]">
+  Booked Trips
+</h1>
 
-        <p className="text-gray-600 mt-2">
-          Calendar-generated trips appear here for driver, vehicle, and billing management.
-        </p>
+<p className="text-gray-600 mt-2">
+  All planned transport trips in one place. Open a trip to manage its operations.
+</p>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
           <div className="bg-white rounded-xl shadow p-5">
@@ -393,64 +369,6 @@ export default function TripsPage() {
           </div>
         </div>
 
-        {/* Live Driver Tracking */}
-        <div className="bg-white rounded-xl shadow p-6 mt-6">
-          <h2 className="text-2xl font-bold text-[#061B33]">
-            📍 Live Driver Tracking
-          </h2>
-          <p className="text-gray-500 mb-4">
-            Drivers currently transmitting live GPS.
-          </p>
-          {liveDrivers.length === 0 ? (
-            <p className="text-gray-500">
-              No drivers are currently tracking.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {liveDrivers.map((driver) => (
-                <div
-                  key={driver.driver_id}
-                  className="rounded-xl border bg-green-50 p-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-lg">
-                        🟢 {driver.driver_name}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Trip: {driver.trip_id ?? "Not Assigned"}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Speed: {Math.round(driver.speed ?? 0)} km/h
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Last Update: {" "}
-                        {new Date(driver.updated_at).toLocaleTimeString()}
-                      </p>
-                    </div>
-                    <div>
-                      {driver.is_tracking ? (
-                        (driver.speed ?? 0) > 5 ? (
-                          <span className="rounded-full bg-green-100 px-3 py-1 font-bold text-green-700">
-                            🟢 MOVING
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-yellow-100 px-3 py-1 font-bold text-yellow-700">
-                            🟡 IDLE
-                          </span>
-                        )
-                      ) : (
-                        <span className="rounded-full bg-red-100 px-3 py-1 font-bold text-red-700">
-                          🔴 OFFLINE
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         <div className="bg-white rounded-xl shadow p-6 mt-6">
           <input
@@ -462,179 +380,66 @@ export default function TripsPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow p-6 mt-6">
-          <h2 className="text-xl font-bold mb-4">Trip List</h2>
+          <h2 className="text-xl font-bold mb-4">Booked Trips</h2>
 
           {filteredTrips.length === 0 && (
-            <p className="text-gray-500">No trips found.</p>
+            <p className="text-gray-500">No booked trips found.</p>
           )}
 
           <div className="space-y-4">
             {filteredTrips.map((trip) => (
               <TripCard key={trip.id}>
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                  <div>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+
+                  <div className="space-y-1">
                     <p className="text-2xl font-bold text-[#061B33]">
                       🚐 {trip.trip_code}
                     </p>
-                    <p><strong>Date:</strong> {trip.trip_date}</p>
-                    <p><strong>Shift:</strong> {trip.shift}</p>
-                    <p><strong>Area:</strong> {trip.area}</p>
-                    <p><strong>Pickup:</strong> {trip.pickup_time}</p>
-                    <p><strong>Drop-off:</strong> {trip.dropoff_time}</p>
-                    <p><strong>Passengers:</strong> {trip.passenger_count}</p>
-                    <p><strong>Estimated KM:</strong> {trip.estimated_km ? `${trip.estimated_km} km` : "Not set"}</p>
-                    <p><strong>Status:</strong> <StatusBadge status={trip.status} /></p>
-                  </div>
 
-                  <div className="grid grid-cols-1 gap-3 w-full md:max-w-md">
-                    <select
-                      value={trip.driver_name || ""}
-                      onChange={(e) =>
-                        setTrips((current) =>
-                          current.map((item) =>
-                            item.id === trip.id
-                              ? { ...item, driver_name: e.target.value }
-                              : item
-                          )
-                        )
-                      }
-                      className="border p-3 rounded-lg"
-                    >
-                      <option value="">Select Driver</option>
-                      {drivers.map((driver) => (
-                        <option key={driver.id} value={driver.full_name || ""}>
-                          {driver.full_name}
-                        </option>
-                      ))}
-                    </select>
+                    <p className="text-gray-600">
+                      {trip.trip_date || "Date not set"} · {trip.shift || "Shift not set"}
+                    </p>
 
-                    <input
-                      value={trip.vehicle_name || ""}
-                      onChange={(e) =>
-                        setTrips((current) =>
-                          current.map((item) =>
-                            item.id === trip.id
-                              ? { ...item, vehicle_name: e.target.value }
-                              : item
-                          )
-                        )
-                      }
-                      className="border p-3 rounded-lg"
-                      placeholder="Vehicle name"
-                    />
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                      <p>
+                        <strong>Passengers:</strong>{" "}
+                        {trip.passenger_count ?? 0}
+                      </p>
 
-                    <input
-                      value={trip.vehicle_registration || ""}
-                      onChange={(e) =>
-                        setTrips((current) =>
-                          current.map((item) =>
-                            item.id === trip.id
-                              ? { ...item, vehicle_registration: e.target.value }
-                              : item
-                          )
-                        )
-                      }
-                      className="border p-3 rounded-lg"
-                      placeholder="Vehicle registration"
-                    />
+                      <p>
+                        <strong>Distance:</strong>{" "}
+{trip.distance_km
+  ? `${trip.distance_km} km`
+  : "Not set"}
+                      </p>
 
-                    <button
-                      onClick={() => updateTrip(trip)}
-                      className="bg-[#061B33] text-white px-5 py-3 rounded-lg font-bold"
-                    >
-                      Save Driver & Vehicle
-                    </button>
-<button
-  onClick={async () => {
-    if (!platformId) return;
+                      <p>
+                        <strong>Driver:</strong>{" "}
+                        {trip.driver_name || "Not assigned"}
+                      </p>
 
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+                      <p>
+                        <strong>Vehicle:</strong>{" "}
+                        {trip.vehicle_name || "Not assigned"}
+                      </p>
+                    </div>
 
-      if (!user) {
-        alert("User not logged in.");
-        return;
-      }
-
-      await dispatchTrip(
-        trip.id,
-        platformId,
-        user.id
-      );
-
-      alert("Trip dispatched successfully.");
-
-      loadTrips();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Dispatch failed.";
-      alert(message);
-    }
-  }}
-  className="bg-orange-500 text-white px-5 py-3 rounded-lg font-bold"
->
-  🚐 Dispatch Trip
-</button>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        onClick={() => updateTrip(trip, "In Progress")}
-                        className="bg-blue-600 text-white px-3 py-2 rounded-lg font-bold"
-                      >
-                        Start
-                      </button>
-
-                      <button
-                        onClick={() => updateTrip(trip, "Completed")}
-                        className="bg-green-600 text-white px-3 py-2 rounded-lg font-bold"
-                      >
-                        Complete
-                      </button>
-
-                      <button
-                        onClick={() => updateTrip(trip, "Cancelled")}
-                        className="bg-red-600 text-white px-3 py-2 rounded-lg font-bold"
-                      >
-                        Cancel
-                      </button>
+                    <div className="mt-3">
+                      <StatusBadge status={trip.status} />
                     </div>
                   </div>
-                </div>
 
-                <div className="mt-4 bg-white rounded-xl border p-4">
-                  <p className="font-bold text-[#061B33]">Assigned Unit</p>
-                  <p>👤 Driver: {trip.driver_name || "Not assigned"}</p>
-                  <p>🚐 Vehicle: {trip.vehicle_name || trip.vehicle_type || "Not assigned"}</p>
-                  <p>🔢 Registration: {trip.vehicle_registration || "Not assigned"}</p>
-                </div>
+                  <div className="w-full md:w-auto">
+                    <a
+                      href={`/trips/${trip.id}`}
+                      className="block bg-[#061B33] text-white text-center px-6 py-3 rounded-lg font-bold hover:bg-orange-500"
+                    >
+                      Open Trip
+                    </a>
+                  </div>
 
-                <div className="mt-4 bg-white rounded-xl border p-4">
-                  <p className="font-bold text-[#061B33] mb-3">📄 Passenger Manifest</p>
-
-                  {passengers.filter((passenger) => passenger.trip_id === trip.id).length === 0 ? (
-                    <p className="text-gray-500">No passengers linked to this trip.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {passengers
-                        .filter((passenger) => passenger.trip_id === trip.id)
-                        .map((passenger, index) => (
-                          <div key={passenger.id} className="border rounded-lg p-3 bg-gray-50">
-                            <p className="font-bold">
-                              {index + 1}. {passenger.full_name || "Unknown Passenger"}
-                            </p>
-                            <p className="text-sm text-gray-600">📞 {passenger.phone || "No phone"}</p>
-                            <p className="text-sm text-gray-600">
-                              📍 {passenger.pickup_address || passenger.pickup_area || "No pickup address"}
-                            </p>
-                            <p className="text-sm font-bold">
-                              Status: {passenger.pickup_status || "Waiting"}
-                            </p>
-                          </div>
-                        ))}
-                    </div>
-                  )}
                 </div>
-            </TripCard>
+              </TripCard>
             ))}
           </div>
 

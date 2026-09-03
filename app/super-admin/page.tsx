@@ -1,8 +1,9 @@
 "use client";
 import ExecutiveKpiCards from "../../components/super-admin/ExecutiveKpiCards";
 import { useEffect, useState } from "react";
-import AdminLayout from "../../components/AdminLayout";
+import SuperAdminLayout from "../../components/SuperAdminLayout";
 import { supabase } from "../../lib/supabase";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 import LiveOperationsPanel from "../../components/super-admin/LiveOperationsPanel";
 type Platform = {
   id: string;
@@ -22,8 +23,7 @@ type PlatformAdmin = {
   full_name: string | null;
   email: string | null;
   role: string | null;
-  status: string | null;
-  password_note: string | null;
+  active: boolean | null;
   created_at: string | null;
 };
 
@@ -43,79 +43,115 @@ export default function SuperAdminPage() {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPasswordNote, setAdminPasswordNote] = useState("");
 const [dashboard, setDashboard] = useState({
+  // Executive KPIs
+  activeCompanies: 0,
+  platformAdmins: 0,
+  totalUsers: 0,
+  monthlyRevenue: 0,
+  outstandingInvoices: 0,
+  openSupportTickets: 0,
+  systemHealth: 100,
+
+  // Live Operations
   activeTrips: 0,
-  completedTrips: 0,
   onlineDrivers: 0,
   activeVehicles: 0,
   pendingBilling: 0,
   pendingPayroll: 0,
   emergencies: 0,
 });
-  async function loadPlatforms() {
-    const { data, error } = await supabase
-      .from("platforms")
-      .select("*")
-      .order("created_at", { ascending: false });
+  
+async function loadPlatforms() {
+  const { data, error } = await supabase
+    .from("platforms")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-console.log("Platforms from Supabase:", data);
-    setPlatforms(data || []);
+  if (error) {
+    alert(error.message);
+    return;
   }
 
-  async function loadPlatformAdmins() {
-    const { data, error } = await supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("role", "admin")
-      .order("created_at", { ascending: false });
+  console.log("Platforms from Supabase:", data);
+  setPlatforms(data || []);
+}
+async function loadPlatformAdmins() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setPlatformAdmins(data || []);
+  if (!session?.access_token) {
+    console.error("No Super Admin session available.");
+    return;
   }
 
-  async function createPlatform() {
-    if (!platformName || !companyName || !contactEmail) {
-      alert("Platform name, company name, and contact email are required.");
-      return;
+  const response = await fetch(
+    "/api/create-customer-administrator",
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
     }
-const {
-  data: { user },
-} = await supabase.auth.getUser();
+  );
 
-console.log("Logged in user:", user);
-    const { error } = await supabase.from("platforms").insert({
-      name: platformName,
-company_code: companyName,
-      contact_name: contactName,
-      contact_email: contactEmail,
-      contact_phone: contactPhone,
-billing_cycle_days: 14,
-active: true,
-    });
+  const result = await response.json();
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setPlatformName("");
-    setCompanyName("");
-    setContactName("");
-    setContactEmail("");
-    setContactPhone("");
-    setPackageName("Starter");
-
-    loadPlatforms();
+  if (!response.ok) {
+    console.error("Platform Admin load error:", result);
+    alert(
+      result.error ||
+        "Failed to load Platform Administrators."
+    );
+    return;
   }
 
-async function createPlatformAdmin() {
+  const admins = result.platform_admins || [];
+
+  console.log(
+    "SUPER ADMIN PLATFORM ADMINS:",
+    admins
+  );
+
+  setPlatformAdmins(admins);
+
+  setDashboard((current) => ({
+    ...current,
+    platformAdmins: admins.length,
+    totalUsers: admins.length,
+  }));
+}
+async function createPlatform() {
+  if (!platformName || !companyName || !contactEmail) {
+    alert("Platform name, company name, and contact email are required.");
+    return;
+  }
+
+  const { error } = await supabase.from("platforms").insert({
+    name: platformName,
+    company_code: companyName,
+    contact_name: contactName,
+    contact_email: contactEmail,
+    contact_phone: contactPhone,
+    billing_cycle_days: 14,
+    active: true,
+  });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setPlatformName("");
+  setCompanyName("");
+  setContactName("");
+  setContactEmail("");
+  setContactPhone("");
+  setPackageName("Starter");
+
+  loadPlatforms();
+}
+async function createCustomerAdministrator() {
 console.log({
   adminPlatformId,
   adminName,
@@ -136,7 +172,7 @@ const {
   data: { session },
 } = await supabase.auth.getSession();
 
-const response = await fetch("/api/create-platform-admin", {
+const response = await fetch("/api/create-customer-administrator", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
@@ -158,7 +194,7 @@ const response = await fetch("/api/create-platform-admin", {
   }
 
   alert(
-    `Platform Admin created.\n\nEmail: ${adminEmail}\nPassword: ${temporaryPassword}`
+    `Customer Administrator created successfully.\n\nEmail: ${adminEmail}\nPassword: ${temporaryPassword}`
   );
 
   setAdminPlatformId("");
@@ -169,8 +205,9 @@ const response = await fetch("/api/create-platform-admin", {
   loadPlatformAdmins();
 }
 async function loadDashboard() {
-
   const [
+    { data: platformData, error: platformError },
+    { data: adminData, error: adminError },
     trips,
     drivers,
     vehicles,
@@ -178,6 +215,13 @@ async function loadDashboard() {
     payroll,
     emergencies,
   ] = await Promise.all([
+    supabase
+      .from("platforms")
+      .select("id"),
+    supabase
+      .from("user_profiles")
+      .select("id, role")
+      .eq("role", "admin"),
     supabase.from("trips").select("id,status"),
     supabase.from("drivers").select("id,availability_status"),
     supabase.from("vehicles").select("id,status"),
@@ -186,21 +230,32 @@ async function loadDashboard() {
     supabase.from("emergency_alerts").select("id,status"),
   ]);
 
+  if (platformError) {
+    console.error("Failed to load platforms:", platformError);
+  }
+
+  if (adminError) {
+    console.error("Failed to load platform administrators:", adminError);
+  }
+
   setDashboard({
+    // Executive KPIs
+    activeCompanies: platformData?.length ?? 0,
+    platformAdmins: adminData?.length ?? 0,
+    totalUsers: adminData?.length ?? 0,
+    monthlyRevenue: 0,
+    outstandingInvoices: 0,
+    openSupportTickets: 0,
+    systemHealth: 100,
+
+    // Live Operations
     activeTrips:
       trips.data?.filter(
         (t) =>
           t.status === "started" ||
           t.status === "en_route" ||
-          t.status === "Assigned" ||
-          t.status === "In Progress"
-      ).length ?? 0,
-
-    completedTrips:
-      trips.data?.filter(
-        (t) =>
-          t.status === "completed" ||
-          t.status === "Completed"
+          t.status === TRIP_STATUS.ASSIGNED ||
+          t.status === TRIP_STATUS.IN_TRANSIT
       ).length ?? 0,
 
     onlineDrivers:
@@ -244,13 +299,16 @@ async function loadDashboard() {
 useEffect(() => {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   loadPlatforms();
+  loadPlatformAdmins();
   loadDashboard();
 }, []);
-  return (
-    <AdminLayout>
-      <main className="min-h-screen bg-gray-100 p-6">
+
+
+return (
+  <SuperAdminLayout>
+    <main className="min-h-screen bg-gray-100 p-6">
         <h1 className="text-4xl font-bold text-[#061B33]">
-          Super Admin Portal
+ GHO Platform Administration
         </h1>
 <ExecutiveKpiCards dashboard={dashboard} />
 
@@ -261,30 +319,104 @@ useEffect(() => {
 />
 
 <p className="text-gray-600 mt-2">
-          Create and manage client platforms for Corneluis Group Pty Ltd.
+Manage customer companies, platform administrators,
+  subscriptions, billing, security and the overall GHO platform.
         </p>
+
+        <section className="mt-10">
+  <h2 className="text-3xl font-black text-[#061B33]">
+    Customer Management
+  </h2>
+
+  <p className="mt-2 text-gray-500">
+    Register new customer companies, assign administrators and manage existing customers.
+  </p>
+</section>
+
+        <div className="mb-4">
+  <span className="inline-flex items-center rounded-full bg-orange-100 px-3 py-1 text-sm font-bold text-orange-700">
+    Step 1
+  </span>
+
+  <h3 className="mt-3 text-2xl font-bold text-[#061B33]">
+    Create Customer Company
+  </h3>
+
+  <p className="mt-1 text-gray-500">
+    Register a new company on the GHO platform.
+  </p>
+</div>
 
         <div className="bg-white rounded-xl shadow p-6 mt-6">
           <h2 className="text-xl font-bold mb-4">Create New Platform</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input value={platformName} onChange={(e) => setPlatformName(e.target.value)} className="border p-3 rounded-lg" placeholder="Platform Name e.g. ABC Transport" />
-            <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="border p-3 rounded-lg" placeholder="Company Name" />
-            <input value={contactName} onChange={(e) => setContactName(e.target.value)} className="border p-3 rounded-lg" placeholder="Contact Person" />
-            <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className="border p-3 rounded-lg" placeholder="Contact Email" />
-            <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className="border p-3 rounded-lg" placeholder="Contact Phone" />
 
-            <select value={packageName} onChange={(e) => setPackageName(e.target.value)} className="border p-3 rounded-lg">
-              <option>Starter</option>
-              <option>Professional</option>
-              <option>Enterprise</option>
-            </select>
-          </div>
+  <input
+    value={platformName}
+    onChange={(e) => setPlatformName(e.target.value)}
+    className="border p-3 rounded-lg"
+    placeholder="Customer Company Name"
+  />
+
+  <input
+    value={companyName}
+    onChange={(e) => setCompanyName(e.target.value)}
+    className="border p-3 rounded-lg"
+    placeholder="Registered Company Name"
+  />
+
+  <input
+    value={contactName}
+    onChange={(e) => setContactName(e.target.value)}
+    className="border p-3 rounded-lg"
+    placeholder="Primary Contact"
+  />
+
+  <input
+    value={contactEmail}
+    onChange={(e) => setContactEmail(e.target.value)}
+    className="border p-3 rounded-lg"
+    placeholder="Business Email"
+  />
+
+  <input
+    value={contactPhone}
+    onChange={(e) => setContactPhone(e.target.value)}
+    className="border p-3 rounded-lg"
+    placeholder="Business Phone"
+  />
+
+  <select
+    value={packageName}
+    onChange={(e) => setPackageName(e.target.value)}
+    className="border p-3 rounded-lg"
+  >
+    <option>Starter</option>
+    <option>Professional</option>
+    <option>Enterprise</option>
+  </select>
+
+</div>
 
           <button onClick={createPlatform} className="mt-6 bg-orange-500 text-white px-6 py-3 rounded-lg font-bold">
             Create Platform
           </button>
         </div>
+
+        <div className="mb-4">
+  <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-bold text-blue-700">
+    Step 2
+  </span>
+
+  <h3 className="mt-3 text-2xl font-bold text-[#061B33]">
+    Create Customer Administrator
+  </h3>
+
+  <p className="mt-1 text-gray-500">
+    Assign the first administrator who will manage the customer's transport operations.
+  </p>
+</div>
 
         <div className="bg-white rounded-xl shadow p-6 mt-6">
           <h2 className="text-xl font-bold mb-4">Create Platform Admin</h2>
@@ -301,21 +433,31 @@ useEffect(() => {
   <option value="">Select Platform</option>
 
   {platforms.map((platform) => (
-    <option key={platform.id} value={platform.id}>
-      {platform.name} ({platform.id})
-    </option>
+<option key={platform.id} value={platform.id}>
+  {platform.name}
+</option>
   ))}
 </select>
 
-            <input value={adminName} onChange={(e) => setAdminName(e.target.value)} className="border p-3 rounded-lg" placeholder="Admin Full Name" />
-            <input value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} className="border p-3 rounded-lg" placeholder="Admin Email" />
-            <input value={adminPasswordNote} onChange={(e) => setAdminPasswordNote(e.target.value)} className="border p-3 rounded-lg" placeholder="Password note e.g. temporary password" />
+            <input value={adminName} onChange={(e) => setAdminName(e.target.value)} className="border p-3 rounded-lg" placeholder="Administrator Full Name" />
+            <input value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} className="border p-3 rounded-lg" placeholder="Administrator Email" />
+            <input value={adminPasswordNote} onChange={(e) => setAdminPasswordNote(e.target.value)} className="border p-3 rounded-lg" placeholder="Temporary Password (optional)" />
           </div>
 
-          <button onClick={createPlatformAdmin} className="mt-6 bg-[#061B33] text-white px-6 py-3 rounded-lg font-bold">
+          <button onClick={createCustomerAdministrator} className="mt-6 bg-[#061B33] text-white px-6 py-3 rounded-lg font-bold">
             Create Platform Admin
           </button>
         </div>
+
+        <section className="mt-10">
+  <h2 className="text-3xl font-black text-[#061B33]">
+    Customer Management
+  </h2>
+
+  <p className="mt-2 text-gray-500">
+    View and manage customer companies and their administrators.
+  </p>
+</section>
 
         <div className="bg-white rounded-xl shadow p-6 mt-6">
           <h2 className="text-xl font-bold mb-4">Platforms</h2>
@@ -378,26 +520,24 @@ useEffect(() => {
             <strong>Role:</strong> {admin.role}
           </p>
 
-          <p>
-            <strong>Status:</strong> {admin.status}
-          </p>
+<p>
+  <strong>Status:</strong>{" "}
+  {admin.active ? "Active" : "Inactive"}
+</p>
 
           <p>
             <strong>Platform:</strong>{" "}
             {platform?.name || admin.platform_id}
           </p>
 
-          <p>
-            <strong>Password Note:</strong>{" "}
-            {admin.password_note || "None"}
-          </p>
+
         </div>
       );
     })}
   </div>
 </div>
 
-      </main>
-    </AdminLayout>
-  );
+    </main>
+  </SuperAdminLayout>
+);
   }

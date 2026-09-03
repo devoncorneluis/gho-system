@@ -12,21 +12,23 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: Request) {
   try {
-    const authResult = await authorizePrivilegedRoute(request, ["admin", "super_admin"]);
+    const authResult = await authorizePrivilegedRoute(request, ["admin"]);
+
     if (!authResult.ok) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      );
     }
 
-    const {
-      email,
-      password,
-      full_name,
-      platform_id,
-    } = await request.json();
+    const { email, full_name, platform_id } = await request.json();
 
-    if (!email || !password || !full_name || !platform_id) {
+    if (!email || !full_name || !platform_id) {
       return NextResponse.json(
-        { error: "email, password, full_name, and platform_id are required." },
+        {
+          error:
+            "email, full_name, and platform_id are required.",
+        },
         { status: 400 }
       );
     }
@@ -39,16 +41,24 @@ export async function POST(request: Request) {
       })
     ) {
       return NextResponse.json(
-        { error: "Caller is not authorized for the requested platform assignment." },
+        {
+          error:
+            "Caller is not authorized for the requested platform assignment.",
+        },
         { status: 403 }
       );
     }
 
+    const origin = new URL(request.url).origin;
+
     const { data: authData, error: authError } =
-      await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
+      await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${origin}/activate-account`,
+        data: {
+          full_name,
+          role: "driver",
+          platform_id,
+        },
       });
 
     if (authError) {
@@ -60,12 +70,11 @@ export async function POST(request: Request) {
 
     const { error: profileError } =
       await supabaseAdmin.from("user_profiles").insert({
-        user_id: authData.user.id,
+id: authData.user.id,
         platform_id,
         full_name,
         email,
         role: "driver",
-        status: "Active",
       });
 
     if (profileError) {
@@ -78,8 +87,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       user_id: authData.user.id,
+      invited: true,
+      message: `Driver invitation sent to ${email}.`,
     });
-  } catch {
+  } catch (error) {
+    console.error("Create driver user error:", error);
+
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }

@@ -4,6 +4,7 @@ import AdminLayout from "../../components/AdminLayout";
 import FleetMap from "../../components/maps/FleetMap";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import { supabase } from "../../lib/supabase";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 
 type Activity = {  id: string;  title: string;  created_at: string;};
 type FleetDriver = {  driver_id: string;  driver_name: string;  trip_code: string | null;  vehicle_name: string | null;  speed: number | null;  is_tracking: boolean;  updated_at: string;  driver_response?: string | null;  driver_response_at?: string | null;  dispatched_at?: string | null;  dispatched_by?: string | null;};
@@ -75,17 +76,22 @@ export default function LiveDispatchPage() {
   const loadDashboard = useCallback(async () => {
     if (!platformId) return;
 
-    const { count: online } = await supabase
-      .from("driver_locations")
-      .select("*", { count: "exact", head: true })
-      .eq("platform_id", platformId)
-      .eq("is_tracking", true);
+const { data: onlineLocations } = await supabase
+  .from("driver_locations")
+  .select(`
+    driver_id,
+    drivers!inner(platform_id)
+  `)
+  .eq("drivers.platform_id", platformId)
+  .eq("is_tracking", true);
+
+const online = onlineLocations?.length ?? 0;
 
     const { count: trips } = await supabase
       .from("trips")
       .select("*", { count: "exact", head: true })
       .eq("platform_id", platformId)
-      .eq("status", "In Progress");
+      .eq("status", TRIP_STATUS.IN_TRANSIT);
 
     const { count: emergency } = await supabase
       .from("emergency_alerts")
@@ -94,22 +100,141 @@ export default function LiveDispatchPage() {
       .eq("status", "Active");
 
     const { count: vehicles } = await supabase
-.from("vehicles")
-.select("*", { count: "exact", head: true })
-    .eq("platform_id", platformId)
-.eq("status", "Available");
+      .from("vehicles")
+      .select("*", { count: "exact", head: true })
+      .eq("platform_id", platformId)
+      .eq("status", "Available");
+
     setDriversOnline(online ?? 0);
     setActiveTrips(trips ?? 0);
     setEmergencies(emergency ?? 0);
     setAvailableVehicles(vehicles ?? 0);
   }, [platformId]);
 
-  const loadActivities = useCallback(async () => {  if (!platformId) return; const { data, error } = await supabase    .from("notification_logs")    .select("id, title, created_at")    .eq("platform_id", platformId)    .order("created_at", { ascending: false })    .limit(10);  if (error) {    console.error(error.message);    return;  }  setActivities(data || []);}, [platformId]);
+  const loadActivities = useCallback(async () => {
+    if (!platformId) return;
 
-  const loadFleet = useCallback(async () => {  if (!platformId) return; const { data, error } = await supabase    .from("driver_locations")    .select(`      driver_id,      speed,      updated_at,      is_tracking,      drivers(full_name),      trips(trip_code, driver_response, driver_response_at, dispatched_at, dispatched_by),      vehicles(vehicle_name)    `)    .eq("platform_id", platformId);  if (error) {    console.error(error.message);    return;  }  setFleet(    ((data as DriverLocationWithRelations[] | null) || []).map((item) => ({      driver_id: item.driver_id,      driver_name: item.drivers?.full_name ?? "Unknown",      trip_code: item.trips?.trip_code ?? "-",      vehicle_name: item.vehicles?.vehicle_name ?? "-",      speed: item.speed,      is_tracking: item.is_tracking,      updated_at: item.updated_at,      driver_response: item.trips?.driver_response ?? null,      driver_response_at: item.trips?.driver_response_at ?? null,      dispatched_at: item.trips?.dispatched_at ?? null,      dispatched_by: item.trips?.dispatched_by ?? null,    }))  );}, [platformId]);
+    const { data, error } = await supabase
+      .from("notification_logs")
+      .select("id, title, created_at")
+      .eq("platform_id", platformId)
+      .order("created_at", { ascending: false })
+      .limit(10);
 
-  const loadLiveDrivers = useCallback(async () => {  if (!platformId) return; const { data, error } = await supabase    .from("driver_locations")    .select(`      driver_id,      trip_id,      latitude,      longitude,      speed,      heading,      accuracy,      is_tracking,      updated_at,      drivers(full_name)    `)    .eq("platform_id", platformId)    .eq("is_tracking", true);  if (error) {    console.error(error.message);    return;  }  setLiveDrivers(    ((data as DriverLocationWithRelations[] | null) || []).map((item) => ({      driver_id: item.driver_id,      trip_id: item.trip_id ?? null,      latitude: item.latitude ?? 0,      longitude: item.longitude ?? 0,      speed: item.speed,      heading: item.heading ?? null,      accuracy: item.accuracy ?? null,      is_tracking: item.is_tracking,      updated_at: item.updated_at,      driver_name: item.drivers?.full_name ?? "Unknown Driver",    }))  );}, [platformId]);
+    if (error) {
+      console.error(error.message);
+      return;
+    }
 
+    setActivities(data || []);
+  }, [platformId]);
+
+  const loadFleet = useCallback(async () => {
+    if (!platformId) return;
+
+    const { data, error } = await supabase
+      .from("driver_locations")
+      .select(`
+        driver_id,
+        speed,
+        updated_at,
+        is_tracking,
+        drivers!inner(
+          full_name,
+          platform_id
+        ),
+        trips(
+          trip_code,
+          driver_response,
+          driver_response_at,
+          dispatched_at,
+          dispatched_by
+        ),
+        vehicles(vehicle_name)
+      `)
+      .eq("drivers.platform_id", platformId);
+
+    if (error) {
+      console.error(error.message);
+      return;
+    }
+
+    setFleet(
+      ((data as DriverLocationWithRelations[] | null) || []).map(
+        (item) => ({
+          driver_id: item.driver_id,
+          driver_name:
+            item.drivers?.full_name ?? "Unknown",
+          trip_code:
+            item.trips?.trip_code ?? "-",
+          vehicle_name:
+            item.vehicles?.vehicle_name ?? "-",
+          speed: item.speed,
+          is_tracking: item.is_tracking,
+          updated_at: item.updated_at,
+          driver_response:
+            item.trips?.driver_response ?? null,
+          driver_response_at:
+            item.trips?.driver_response_at ?? null,
+          dispatched_at:
+            item.trips?.dispatched_at ?? null,
+          dispatched_by:
+            item.trips?.dispatched_by ?? null,
+        })
+      )
+    );
+  }, [platformId]);
+
+  const loadLiveDrivers = useCallback(async () => {
+    if (!platformId) return;
+
+    const { data, error } = await supabase
+      .from("driver_locations")
+      .select(`
+        driver_id,
+        trip_id,
+        latitude,
+        longitude,
+        speed,
+        heading,
+        accuracy,
+        is_tracking,
+        updated_at,
+        drivers!inner(
+          full_name,
+          platform_id
+        )
+      `)
+      .eq("drivers.platform_id", platformId)
+      .eq("is_tracking", true)
+      .gte(
+        "updated_at",
+        new Date(Date.now() - 60_000).toISOString()
+      );
+
+    if (error) {
+      console.error(error.message);
+      return;
+    }
+
+    setLiveDrivers(
+      ((data as DriverLocationWithRelations[] | null) || []).map(
+        (item) => ({
+          driver_id: item.driver_id,
+          trip_id: item.trip_id ?? null,
+          latitude: item.latitude ?? 0,
+          longitude: item.longitude ?? 0,
+          speed: item.speed,
+          heading: item.heading ?? null,
+          accuracy: item.accuracy ?? null,
+          is_tracking: item.is_tracking,
+          updated_at: item.updated_at,
+          driver_name:
+            item.drivers?.full_name ?? "Unknown Driver",
+        })
+      )
+    );
+  }, [platformId]);
   useEffect(() => {
     async function setupPage() {
       const userPlatform = await getUserPlatform();

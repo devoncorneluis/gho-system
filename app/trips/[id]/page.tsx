@@ -5,6 +5,7 @@ import { publishFleetEvent } from "../../../lib/fleet/fleetEventBus";
 import { getFleetEvent } from "../../../lib/fleet/fleetEventEngine";
 import { logActivity } from "../../../lib/activity/activityLogger";
 import { supabase } from "../../../lib/supabase";
+import { TRIP_STATUS } from "../../../lib/tripStatus";
 import TripTimeline, {
   TimelineEvent,
 } from "../../../components/timeline/TripTimeline";
@@ -138,7 +139,7 @@ async function startTrip() {
   const { error } = await supabase
     .from("trips")
     .update({
-      status: "In Progress",
+      status: TRIP_STATUS.IN_TRANSIT,
       started_at: new Date().toISOString(),
     })
     .eq("id", trip.id)
@@ -200,19 +201,26 @@ async function completeTrip() {
     return;
   }
 
-  const { error } = await supabase
-    .from("trips")
-    .update({
-      status: "Completed",
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", trip.id)
-    .eq("platform_id", trip.platform_id);
+const { data: updatedTrip, error: updateError } = await supabase
+  .from("trips")
+  .update({
+    status: TRIP_STATUS.COMPLETED,
+    completed_at: new Date().toISOString(),
+    actual_end_time: new Date().toISOString(),
+    billable: true,
+    invoiced: false,
+  })
+  .eq("id", trip.id)
+  .eq("platform_id", trip.platform_id)
+  .select("id, platform_id, status, billable, invoiced");
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
+if (updateError) {
+  console.error("Complete Trip update error:", updateError);
+  alert(String(updateError));
+  return;
+}
+
+console.log("Complete Trip updated:", updatedTrip);
 
   publishFleetEvent(
     getFleetEvent("trip_completed", {
@@ -295,7 +303,7 @@ async function cancelTrip() {
   const { error } = await supabase
     .from("trips")
     .update({
-      status: "Cancelled",
+      status: TRIP_STATUS.CANCELLED,
     })
     .eq("id", trip.id)
     .eq("platform_id", trip.platform_id);
@@ -422,7 +430,7 @@ useEffect(() => {
     );
   }
 function gpsStatus() {
-  if (trip?.status === "In Progress") {
+  if (trip?.status === TRIP_STATUS.IN_TRANSIT) {
     return {
       label: "Active",
       colour: "text-green-600",
@@ -518,28 +526,28 @@ function gpsStatus() {
           <button
             onClick={startTrip}
             disabled={
-              trip.status === "In Progress" ||
-              trip.status === "Completed"
+              trip.status === TRIP_STATUS.IN_TRANSIT ||
+              trip.status === TRIP_STATUS.COMPLETED
             }
             className="bg-green-600 text-white rounded-xl p-3 font-bold disabled:bg-gray-400"
           >
-            {trip.status === "In Progress"
+            {trip.status === TRIP_STATUS.IN_TRANSIT
               ? "Trip Started"
-              : trip.status === "Completed"
+              : trip.status === TRIP_STATUS.COMPLETED
               ? "Trip Completed"
               : "Start Trip"}
           </button>
 
           <button
             onClick={completeTrip}
-            disabled={trip.status === "Completed"}
+            disabled={trip.status === TRIP_STATUS.COMPLETED}
             className="bg-blue-600 text-white rounded-xl p-3 font-bold disabled:bg-gray-400"
           >
             Complete Trip
           </button>
 <button
   onClick={cancelTrip}
-  disabled={trip.status === "Completed"}
+  disabled={trip.status === TRIP_STATUS.COMPLETED}
   className="bg-gray-700 text-white rounded-xl p-3 font-bold disabled:bg-gray-400"
 >
   Cancel Trip

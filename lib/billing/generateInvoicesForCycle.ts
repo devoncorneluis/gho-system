@@ -35,13 +35,27 @@ export async function generateInvoicesForCycle(
       platformId
     );
 
+  const { data: billingCycle, error: billingCycleError } =
+    await supabase
+      .from("billing_cycles")
+.select("id, cycle_name, start_date, end_date")
+      .eq("id", billingCycleId)
+      .eq("platform_id", platformId)
+      .single();
+
+  if (billingCycleError || !billingCycle) {
+    throw billingCycleError || new Error("Billing cycle not found.");
+  }
+
   const { data: trips } =
     await supabase
       .from("trips")
       .select("*")
       .eq("platform_id", platformId)
       .eq("billable", true)
-      .eq("invoiced", false);
+      .eq("invoiced", false)
+      .gte("trip_date", billingCycle.start_date)
+      .lte("trip_date", billingCycle.end_date);
 
   const invoiceTrips: InvoiceTrip[] =
     (trips ?? []).map((trip) => ({
@@ -81,18 +95,21 @@ export async function generateInvoicesForCycle(
 
   }
 
-  const invoice =
-    generateInvoice(
-      invoiceTrips,
-      settings
-    );
+const invoice =
+  generateInvoice(
+    invoiceTrips,
+    settings,
+    billingCycle.cycle_name
+  );
 
-  const savedInvoice =
-    await saveInvoice(
-      platformId,
-      billingCycleId,
-      invoice
-    );
+const savedInvoice =
+  await saveInvoice(
+    platformId,
+    billingCycle.start_date,
+    billingCycle.end_date,
+    invoice,
+    settings
+  );
 
   return {
 

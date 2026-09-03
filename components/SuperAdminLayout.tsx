@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import SuperAdminSidebar from "./SuperAdminSidebar";
 
 export default function SuperAdminLayout({
   children,
@@ -36,50 +37,16 @@ export default function SuperAdminLayout({
           🏠 Super Admin Home
         </Link>
 
-        <nav className="space-y-3">
-          <Link href="/super-admin" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
-            🏢 Platforms
-          </Link>
+        <SuperAdminSidebar />
 
-          <Link href="/super-admin" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
-            👤 Platform Admins
-          </Link>
-
-          <Link href="/super-admin" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
-            📊 System Overview
-          </Link>
-
-          <Link href="/super-admin/billing" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
-            💳 Billing
-          </Link>
-
-          <Link href="/super-admin/invoices" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
-            🧾 Invoices
-          </Link>
-
-          <Link href="/super-admin/audit-logs" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
-            📜 Audit Logs
-          </Link>
-
-          <Link href="/super-admin/reports" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
-            📈 Reports
-          </Link>
-
-          <Link href="/release" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
-            🚀 Release Dashboard
-          </Link>
-
-          <Link href="/super-admin/settings" className="block bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 font-bold">
-            ⚙️ Settings
-          </Link>
-
+        <div className="mt-6">
           <button
             onClick={logout}
-            className="w-full bg-red-600 hover:bg-red-700 rounded-xl px-4 py-3 font-bold mt-8"
+            className="w-full bg-red-600 hover:bg-red-700 rounded-xl px-4 py-3 font-bold"
           >
             🚪 Logout
           </button>
-        </nav>
+        </div>
       </aside>
 
       <section className="flex-1">

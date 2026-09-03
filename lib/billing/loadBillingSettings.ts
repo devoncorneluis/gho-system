@@ -16,11 +16,12 @@ export async function loadBillingSettings(
     );
   }
 
-  return {
-    billingMethod: data.billing_method,
-    tripRate: Number(data.trip_rate ?? 0),
-    monthlyFee: Number(data.monthly_fee ?? 0),
-    distanceRate: Number(data.distance_rate ?? 0),
-    vatRate: Number(data.vat_rate ?? 0),
-  };
+return {
+  billingMethod: data.billing_method,
+  tripRate: Number(data.trip_rate ?? 0),
+  passengerRate: Number(data.passenger_rate ?? 0),
+  monthlyFee: Number(data.monthly_fee ?? 0),
+  distanceRate: Number(data.km_rate ?? 0),
+  vatRate: Number(data.vat_rate ?? 0),
+};
 }

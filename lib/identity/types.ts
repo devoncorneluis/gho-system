@@ -6,6 +6,7 @@ export type IdentityRole =
 
 export interface CreateIdentityUser {
   email: string;
+  password?: string;
   full_name: string;
   platform_id: string;
   role: IdentityRole;

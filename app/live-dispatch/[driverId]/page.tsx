@@ -5,6 +5,7 @@ import AdminLayout from "../../../components/AdminLayout";
 import DriverTimeline from "../../../components/fleet/DriverTimeline";
 import { getUserPlatform } from "../../../lib/getUserPlatform";
 import { supabase } from "../../../lib/supabase";
+import { TRIP_STATUS } from "../../../lib/tripStatus";
 
 type Driver = {
   id: string;
@@ -89,7 +90,10 @@ export default function DriverCommandPage({ params }: Props) {
       .select("*")
       .eq("platform_id", platformId)
       .eq("driver_name", driver?.full_name)
-      .in("status", ["Assigned", "In Progress"])
+      .in("status", [
+        TRIP_STATUS.ASSIGNED,
+        TRIP_STATUS.IN_TRANSIT,
+      ])
       .limit(1)
       .maybeSingle();
 

@@ -6,6 +6,7 @@ import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
 import { dispatchTrip } from "@/lib/dispatchService";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 
 
 type Trip = {
@@ -119,7 +120,7 @@ const success = await dispatchTrip(
 
   setSelectedTrip({
     ...selectedTrip,
-    status: "Dispatched",
+    status: TRIP_STATUS.DISPATCHED,
   });
 }
 
@@ -163,7 +164,10 @@ const filteredTrips = trips.filter((trip) => {
 });
 
 const activeTrips = filteredTrips.filter(
-  (trip) => trip.status === "Started" || trip.status === "In Progress"
+  (trip) =>
+    trip.status === TRIP_STATUS.EN_ROUTE ||
+    trip.status === TRIP_STATUS.PICKING_UP ||
+    trip.status === TRIP_STATUS.IN_TRANSIT
 ).length;
 
 // const filteredTrips = trips.filter((trip) => {
@@ -179,7 +183,7 @@ const activeTrips = filteredTrips.filter(
 //   return matchesSearch && matchesStatus;
 // });
   const scheduledTrips = filteredTrips.filter(
-    (trip) => trip.status === "Scheduled"
+    (trip) => trip.status === TRIP_STATUS.PLANNED
   ).length;
 const totalPassengers = filteredTrips.reduce(
   (sum, trip) => sum + (trip.passenger_count ?? 0),
@@ -194,27 +198,26 @@ const assignedVehicles = filteredTrips.filter(
   (trip) => trip.vehicle_name
 ).length;
   const completedTrips = filteredTrips.filter(
-
-    (trip) => trip.status === "Completed"
+    (trip) => trip.status === TRIP_STATUS.COMPLETED
   ).length;
 function getStatusBadge(status: string | null) {
   switch (status) {
-    case "Scheduled":
+    case TRIP_STATUS.PLANNED:
       return "bg-blue-100 text-blue-700";
 
-    case "Confirmed":
+    case TRIP_STATUS.APPROVED:
       return "bg-cyan-100 text-cyan-700";
 
-    case "Started":
+    case TRIP_STATUS.EN_ROUTE:
       return "bg-orange-100 text-orange-700";
 
-    case "In Progress":
+    case TRIP_STATUS.IN_TRANSIT:
       return "bg-amber-100 text-amber-700";
 
-    case "Completed":
+    case TRIP_STATUS.COMPLETED:
       return "bg-green-100 text-green-700";
 
-    case "Cancelled":
+    case TRIP_STATUS.CANCELLED:
       return "bg-red-100 text-red-700";
 
     default:
@@ -283,12 +286,12 @@ function getStatusBadge(status: string | null) {
       className="border rounded-xl p-3"
     >
       <option>All</option>
-      <option>Scheduled</option>
-      <option>Confirmed</option>
-      <option>Started</option>
-      <option>In Progress</option>
-      <option>Completed</option>
-      <option>Cancelled</option>
+      <option value={TRIP_STATUS.PLANNED}>Scheduled</option>
+      <option value={TRIP_STATUS.APPROVED}>Confirmed</option>
+      <option value={TRIP_STATUS.EN_ROUTE}>Started</option>
+      <option value={TRIP_STATUS.IN_TRANSIT}>In Progress</option>
+      <option value={TRIP_STATUS.COMPLETED}>Completed</option>
+      <option value={TRIP_STATUS.CANCELLED}>Cancelled</option>
     </select>
 
     <button

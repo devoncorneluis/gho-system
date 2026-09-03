@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { TRIP_STATUS } from "../tripStatus";
 import { Recommendation } from "./recommendationEngine";
 
 type AssignArgs = {
@@ -17,7 +18,7 @@ export async function assignRecommendation({
     .update({
       driver_name: recommendation.driver.name,
       vehicle_name: recommendation.vehicle.name,
-      status: "Assigned",
+      status: TRIP_STATUS.ASSIGNED,
       driver_response: "Pending",
     })
     .eq("id", tripId)

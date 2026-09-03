@@ -4,6 +4,7 @@ import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 
 type DriverLocation = {
   id: string;
@@ -70,7 +71,10 @@ export default function AgentTrackingPage() {
       .select("*")
       .eq("platform_id", finalPlatformId)
       .eq("trip_date", today)
-      .in("status", ["Assigned", "In Progress"])
+      .in("status", [
+        TRIP_STATUS.ASSIGNED,
+        TRIP_STATUS.IN_TRANSIT,
+      ])
       .in("id", myTripIds);
 
     if (tripError) {

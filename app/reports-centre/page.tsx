@@ -1,4 +1,6 @@
 "use client";
+
+import { TRIP_STATUS } from "../../lib/tripStatus";
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { supabase } from "../../lib/supabase";
@@ -83,8 +85,8 @@ setTripCount(tripRows.length);
 
 const active = tripRows.filter(
   (trip) =>
-    trip.status === "Assigned" ||
-    trip.status === "In Progress"
+    trip.status === TRIP_STATUS.ASSIGNED ||
+    trip.status === TRIP_STATUS.IN_TRANSIT
 ).length;
 
 setActiveTrips(active);

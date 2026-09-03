@@ -16,7 +16,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.resetPasswordForEmail(
       email.trim(),
       {
-        redirectTo: "http://localhost:3000/reset-password",
+redirectTo: "http://localhost:3000/reset-password",
       }
     );
 
@@ -39,39 +39,43 @@ export default function LoginPage() {
       return;
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .single();
+const { data: profile, error: profileError } = await supabase
+  .from("user_profiles")
+  .select("role")
+  .eq("id", data.user.id)
+  .maybeSingle();
 
-    if (profileError) {
-      alert(profileError.message);
-      return;
+if (profileError) {
+  alert(profileError.message);
+  return;
+}
+
+if (!profile?.role) {
+  alert("No profile role found for this user.");
+  return;
+}
+
+switch (profile.role) {
+  case "super_admin":
+    window.location.href = "/super-admin";
+    return;
+
+  case "admin":
+    window.location.href = "/admin";
+    return;
+
+  case "driver":
+    window.location.href = "/driver";
+    return;
+
+  case "agent":
+    window.location.href = "/agent-tracking";
+    return;
+
+  default:
+    alert("Unsupported profile role.");
     }
-
-    switch (profile?.role) {
-      case "super_admin":
-        window.location.href = "/super-admin";
-        return;
-
-      case "admin":
-        window.location.href = "/admin";
-        return;
-
-      case "driver":
-        window.location.href = "/driver";
-        return;
-
-      case "agent":
-        window.location.href = "/agent-tracking";
-        return;
-
-      default:
-        alert("No profile role found for this user.");
-    }
-  }
-
+}
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border">

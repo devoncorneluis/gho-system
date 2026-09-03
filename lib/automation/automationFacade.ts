@@ -15,6 +15,8 @@ import {
   getOperationsTimeline,
   type TimelineEvent,
 } from "../operations/timelineService";
+
+import { TRIP_STATUS } from "../tripStatus";
 export type ControlTowerAction =
   | "approve_recommendation"
   | "reassign_driver"
@@ -184,7 +186,7 @@ export async function evaluateControlTower(
     driverResponse: action === "reassign_driver" ? "rejected" : "pending",
     passengerCount: 11,
     trackingFreshnessMinutes: 7,
-    currentStatus: "In Progress",
+    currentStatus: TRIP_STATUS.IN_TRANSIT,
   });
 
   const automationResult = await runAutomationEngine({
@@ -207,7 +209,7 @@ export async function evaluateControlTower(
     tripSnapshot: {
       tripId: "trip-104",
       tripCode: "TRIP-104",
-      status: "In Progress",
+      status: TRIP_STATUS.IN_TRANSIT,
       pickupDueAt: new Date(Date.now() - 9 * 60000).toISOString(),
       dropoffDueAt: new Date(Date.now() + 14 * 60000).toISOString(),
       driverResponse: action === "reassign_driver" ? "rejected" : "pending",

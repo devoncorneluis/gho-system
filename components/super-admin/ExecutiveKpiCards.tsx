@@ -1,13 +1,17 @@
 type Dashboard = {
-  activeTrips: number;
-  completedTrips: number;
+  activeCompanies: number;
+  platformAdmins: number;
+  totalUsers: number;
+  monthlyRevenue: number;
+  outstandingInvoices: number;
+  openSupportTickets: number;
+  systemHealth: number;
   onlineDrivers: number;
   activeVehicles: number;
   pendingBilling: number;
   pendingPayroll: number;
   emergencies: number;
 };
-
 type Props = {
   dashboard: Dashboard;
 };
@@ -20,64 +24,64 @@ export default function ExecutiveKpiCards({
 
       <div className="rounded-xl bg-white p-6 shadow">
         <p className="text-sm font-semibold text-gray-500">
-          🚐 Active Trips
+🏢 Active Customer Companies
         </p>
         <h2 className="mt-2 text-4xl font-black text-[#061B33]">
-          {dashboard.activeTrips}
+          {dashboard.activeCompanies}
         </h2>
       </div>
 
       <div className="rounded-xl bg-white p-6 shadow">
         <p className="text-sm font-semibold text-gray-500">
-          ✅ Completed Trips
+          ✅ Platform Admins
         </p>
         <h2 className="mt-2 text-4xl font-black text-green-600">
-          {dashboard.completedTrips}
+          {dashboard.platformAdmins}
         </h2>
       </div>
 
       <div className="rounded-xl bg-white p-6 shadow">
         <p className="text-sm font-semibold text-gray-500">
-          👨‍✈️ Drivers Online
+👥 Total Registered Users
         </p>
         <h2 className="mt-2 text-4xl font-black text-blue-600">
-          {dashboard.onlineDrivers}
+          {dashboard.totalUsers}
         </h2>
       </div>
 
       <div className="rounded-xl bg-white p-6 shadow">
         <p className="text-sm font-semibold text-gray-500">
-          🚗 Active Vehicles
+💰 Monthly Revenue
         </p>
         <h2 className="mt-2 text-4xl font-black text-orange-600">
-          {dashboard.activeVehicles}
+          {dashboard.monthlyRevenue}
         </h2>
       </div>
 
       <div className="rounded-xl bg-white p-6 shadow">
         <p className="text-sm font-semibold text-gray-500">
-          💰 Pending Billing
+🧾 Outstanding Invoices
         </p>
         <h2 className="mt-2 text-4xl font-black text-yellow-600">
-          {dashboard.pendingBilling}
+          {dashboard.outstandingInvoices}
         </h2>
       </div>
 
       <div className="rounded-xl bg-white p-6 shadow">
         <p className="text-sm font-semibold text-gray-500">
-          💵 Pending Payroll
+🎫 Open Support Tickets
         </p>
         <h2 className="mt-2 text-4xl font-black text-purple-600">
-          {dashboard.pendingPayroll}
+          {dashboard.openSupportTickets}
         </h2>
       </div>
 
       <div className="rounded-xl bg-white p-6 shadow">
         <p className="text-sm font-semibold text-gray-500">
-          🚨 Open Emergencies
+🟢 System Health
         </p>
         <h2 className="mt-2 text-4xl font-black text-red-600">
-          {dashboard.emergencies}
+          {dashboard.systemHealth}
         </h2>
       </div>
 

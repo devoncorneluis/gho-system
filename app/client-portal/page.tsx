@@ -4,6 +4,7 @@ import AdminLayout from "../../components/AdminLayout";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { getUserPlatform } from "../../lib/getUserPlatform";
+import { TRIP_STATUS } from "../../lib/tripStatus";
 
 type ActivityLog = {
   id: string;
@@ -44,7 +45,7 @@ useEffect(() => {
         .from("trips")
         .select("*", { count: "exact", head: true })
         .eq("platform_id", platformId)
-        .eq("status", "In Progress"),
+        .eq("status", TRIP_STATUS.IN_TRANSIT),
 
       supabase
         .from("drivers")

@@ -3,17 +3,33 @@
 import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../../lib/supabase";
+import {
+  startTrip as dispatchStartTrip,
+  completeTrip as dispatchCompleteTrip,
+} from "../../../../lib/dispatchService";
 
 type Passenger = {
   id: string;
   full_name: string | null;
-  phone: string |null;
+  phone: string | null;
   pickup_area: string | null;
   pickup_address: string | null;
+  destination_address: string | null;
+  pickup_time: string | null;
+  dropoff_time: string | null;
   pickup_status: string | null;
   pickup_order: number | null;
 };
-
+type Trip = {
+  trip_date: string | null;
+  pickup_time: string | null;
+  dropoff_time: string | null;
+  shift: string | null;
+  status: string | null;
+  platform_id: string | null;
+  driver_id: string | null;
+  vehicle_id: string | null;
+};
 export default function DriverTripPage({
   params,
 }: {
@@ -23,8 +39,34 @@ export default function DriverTripPage({
 const router = useRouter();
 const [tracking, setTracking] = useState(false);
   const [passengers, setPassengers] = useState<Passenger[]>([]);
+  const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
 const [tripStatus, setTripStatus] = useState<string>("");
+
+  const loadTrip = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("trips")
+      .select(`
+        trip_date,
+        pickup_time,
+        dropoff_time,
+        shift,
+        status,
+        platform_id,
+        driver_id,
+        vehicle_id
+      `)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setTrip(data as Trip | null);
+  }, [id]);
+
   const loadPassengers = useCallback(async () => {
     setLoading(true);
 
@@ -36,9 +78,11 @@ const [tripStatus, setTripStatus] = useState<string>("");
         phone,
         pickup_area,
         pickup_address,
+        destination_address,
+        pickup_time,
+        dropoff_time,
         pickup_status,
-        pickup_order,
-        trip_status
+        pickup_order
       `)
       .eq("trip_id", id)
       .order("pickup_order");
@@ -72,27 +116,29 @@ const [tripStatus, setTripStatus] = useState<string>("");
   const loadTripStatus = useCallback(async () => {
     const { data } = await supabase
       .from("trips")
-      .select("trip_status")
+      .select("status")
       .eq("id", id)
       .maybeSingle();
 
-    if (data?.trip_status) {
-      setTripStatus(String(data.trip_status).toLowerCase());
+    if (data?.status) {
+      setTripStatus(String(data.status).toLowerCase());
     }
   }, [id]);
 
-  useEffect(() => {
+useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadTrip();
     void loadPassengers();
     void loadTripStatus();
 
     const interval = setInterval(() => {
+      void loadTrip();
       void loadPassengers();
       void loadTripStatus();
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [id, loadPassengers, loadTripStatus]);
+  }, [id, loadTrip, loadPassengers, loadTripStatus]);
 useEffect(() => {
   if (!tracking) return;
 
@@ -150,42 +196,63 @@ await supabase
     await loadPassengers();
   }
 async function startTrip() {
-  const { error } = await supabase
-    .from("trips")
-.update({
-  trip_status: "started",
-  started_at: new Date().toISOString(),
-})
-    .eq("id", id);
-
-  if (error) {
-    alert(error.message);
+  if (!trip?.platform_id || !trip.driver_id || !trip.vehicle_id) {
+    alert("Trip driver, vehicle, or platform information is missing.");
     return;
   }
 
-  alert("Trip started.");
-  setTripStatus("started");
-  setTracking(true);
+  try {
+    await dispatchStartTrip(
+      supabase,
+      id,
+      trip.platform_id,
+      trip.driver_id,
+      trip.vehicle_id
+    );
+
+    alert("Trip started.");
+    setTripStatus("en_route");
+    setTracking(true);
+    await loadTrip();
+    await loadTripStatus();
+  } catch (error) {
+    console.error(error);
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Unable to start trip."
+    );
+  }
 }
 
 async function completeTrip() {
-  const { error } = await supabase
-    .from("trips")
-.update({
-  trip_status: "completed",
-  completed_at: new Date().toISOString(),
-})
-    .eq("id", id);
-
-  if (error) {
-    alert(error.message);
+  if (!trip?.platform_id || !trip.driver_id || !trip.vehicle_id) {
+    alert("Trip driver, vehicle, or platform information is missing.");
     return;
   }
 
-alert("Trip completed.");
-setTripStatus("completed");
+  try {
+    await dispatchCompleteTrip(
+      supabase,
+      id,
+      trip.platform_id,
+      trip.driver_id,
+      trip.vehicle_id
+    );
 
-router.push("/driver");
+    alert("Trip completed.");
+    setTripStatus("completed");
+    setTracking(false);
+
+    router.push("/driver");
+  } catch (error) {
+    console.error(error);
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Unable to complete trip."
+    );
+  }
 }
 
 return (
@@ -194,7 +261,53 @@ return (
         Driver Trip
       </h1>
 
-      <div className="mb-6">
+            {trip && (
+        <div className="mb-6 rounded-lg border bg-white p-4 shadow">
+          <h2 className="mb-4 text-lg font-bold text-[#0B3A82]">
+            Trip Information
+          </h2>
+
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div>
+              <p className="text-xs font-semibold uppercase text-gray-500">
+                Trip Date
+              </p>
+              <p className="font-bold text-gray-900">
+                {trip.trip_date || "—"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase text-gray-500">
+                Pickup Time
+              </p>
+              <p className="font-bold text-gray-900">
+                {trip.pickup_time || "—"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase text-gray-500">
+                Drop-off Time
+              </p>
+              <p className="font-bold text-gray-900">
+                {trip.dropoff_time || "—"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase text-gray-500">
+                Direction
+              </p>
+              <p className="font-bold text-gray-900">
+                {trip.shift || "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+<div className="mb-6">
 {tripStatus === "scheduled" || tripStatus === "assigned" ? (
   <button
     onClick={startTrip}
@@ -256,48 +369,91 @@ return (
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="font-semibold">
+                  <h2 className="font-semibold text-lg">
                     {passenger.pickup_order}. {passenger.full_name}
                   </h2>
-
-                  <p className="text-sm text-gray-500">
-                    {passenger.pickup_area}
-                  </p>
 
                   <p className="text-sm text-gray-500">
                     {passenger.phone}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      passenger.pickup_status === "Picked Up"
-                        ? "bg-green-100 text-green-700"
-                        : passenger.pickup_status === "Next"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {passenger.pickup_status}
-                  </span>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    passenger.pickup_status === "Picked Up"
+                      ? "bg-green-100 text-green-700"
+                      : passenger.pickup_status === "Next"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {passenger.pickup_status}
+                </span>
+              </div>
 
-                  {passenger.pickup_status === "Picked Up" ? (
-                    <button
-                      disabled
-                      className="rounded bg-gray-300 px-3 py-1 text-xs font-medium text-gray-600 cursor-not-allowed"
-                    >
-                      Completed
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => markPassengerPickedUp(passenger.id)}
-                      className="rounded bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700"
-                    >
-                      Picked Up
-                    </button>
-                  )}
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="rounded-lg bg-gray-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-gray-500">
+                    Pickup Time
+                  </p>
+                  <p className="font-bold text-gray-900">
+                    {passenger.pickup_time || "—"}
+                  </p>
                 </div>
+
+                <div className="rounded-lg bg-gray-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-gray-500">
+                    Drop-off Time
+                  </p>
+                  <p className="font-bold text-gray-900">
+                    {passenger.dropoff_time || "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-lg border-l-4 border-green-500 bg-green-50 p-3">
+                <p className="text-xs font-semibold uppercase text-gray-500">
+                  Pickup Address
+                </p>
+                <p className="font-medium text-gray-900">
+                  {passenger.pickup_address || "No pickup address"}
+                </p>
+              </div>
+
+              <div className="mt-3 rounded-lg border-l-4 border-blue-500 bg-blue-50 p-3">
+                <p className="text-xs font-semibold uppercase text-gray-500">
+                  Destination Address
+                </p>
+                <p className="font-medium text-gray-900">
+                  {passenger.destination_address || "No destination address"}
+                </p>
+              </div>
+
+              <div className="mt-3">
+                <p className="text-sm text-gray-500">
+                  Area:{" "}
+                  <span className="font-medium text-gray-900">
+                    {passenger.pickup_area || "—"}
+                  </span>
+                </p>
+              </div>
+
+              <div className="mt-4">
+                {passenger.pickup_status === "Picked Up" ? (
+                  <button
+                    disabled
+                    className="w-full rounded-lg bg-gray-300 px-3 py-2 text-sm font-medium text-gray-600 cursor-not-allowed"
+                  >
+                    Completed
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => markPassengerPickedUp(passenger.id)}
+                    className="w-full rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  >
+                    Picked Up
+                  </button>
+                )}
               </div>
             </div>
           ))}

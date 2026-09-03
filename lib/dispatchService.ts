@@ -322,11 +322,15 @@ export async function completeTrip(
 
   if (tripError) throw tripError;
 
-  await updateTripStatus(
-    tripId,
-    "in_transit",
-    "completed"
-  );
+await updateTripStatus(
+  tripId,
+  "in_transit",
+  "completed",
+  {
+    platformId,
+    dispatchedBy: driverId,
+  }
+);
 
   await recordTripEvent({
     tripId,
@@ -350,6 +354,18 @@ platform_id: platformId,
     },
   });
 
+
+
+const { error: driverError } = await client
+  .from("drivers")
+  .update({
+    status: "Available",
+    availability_status: "Available",
+  })
+  .eq("platform_id", platformId)
+  .eq("id", driverId);
+
+if (driverError) throw driverError;
 
 
 const { error: vehicleError } = await client
@@ -391,7 +407,11 @@ export async function cancelTrip(
   await updateTripStatus(
     tripId,
     currentStatus,
-    "cancelled"
+    "cancelled",
+    {
+      platformId,
+      dispatchedBy: driverId,
+    }
   );
 
   await recordTripEvent({
@@ -444,9 +464,13 @@ return true;
 }
 export async function getCurrentTripForDriver(
   supabase: unknown,
-  driverId: string
+  driverId: string,
+platformId: string | null
 ) {
   const client = supabase as typeof import("./supabase").supabase;
+
+  const scopedPlatformId = assertPlatformScope(platformId);
+
   const { data, error } = await client
     .from("trips")
     .select(`
@@ -463,6 +487,7 @@ export async function getCurrentTripForDriver(
       destination_latitude,
       destination_longitude
     `)
+    .eq("platform_id", scopedPlatformId)
     .eq("driver_id", driverId)
     .in("status", [
       "assigned",

@@ -6,10 +6,12 @@ export type BillingTrip = {
 export type BillingSettings = {
   billingMethod:
     | "per_trip"
+    | "per_passenger"
     | "monthly"
     | "distance";
 
   tripRate: number;
+  passengerRate: number;
   monthlyFee: number;
   distanceRate: number;
   vatRate: number;
@@ -24,6 +26,12 @@ export function calculateTripCharge(
   switch (settings.billingMethod) {
     case "per_trip":
       subtotal = settings.tripRate;
+      break;
+
+    case "per_passenger":
+      subtotal =
+        trip.passengerCount *
+        settings.passengerRate;
       break;
 
     case "distance":
